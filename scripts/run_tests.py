@@ -3,11 +3,14 @@ import sys
 
 def main():
     timeout = 30  
-    solution_script = 'solution/solution.py'  
+    solution_script = os.path.join(os.path.dirname(os.path.dirname(file)), 'solution', 'solution.py')    
     log_file_name = 'test.log'
     status = "FAILED"
 
     try:
+        if not os.path.isfile(solution_script):
+            raise FileNotFoundError(f"Файл {solution_script} не найден")
+            
         result = subprocess.run(
             [sys.executable, solution_script],
             stdout=subprocess.PIPE,
