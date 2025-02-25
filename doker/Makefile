@@ -2,6 +2,10 @@
 build:
     docker-compose up --build
 
+# Запуск контейнера
+run:
+    docker-compose up
+
 # Остановка и удаление контейнера
 clean:
     docker-compose down
