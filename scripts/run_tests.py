@@ -3,7 +3,7 @@ import sys
 
 def main():
     timeout = 30  
-    solution_script = 'solution.py'  
+    solution_script = 'solution/solution.py'  
     log_file_name = 'test.log'
     status = "FAILED"
 
