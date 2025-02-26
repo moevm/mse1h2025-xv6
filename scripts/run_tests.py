@@ -4,7 +4,7 @@ import sys
 
 def main():
     timeout = 30  
-    solution_script = os.path.join(os.path.dirname(os.path.dirname(file)), 'solution', 'solution.py')    
+    solution_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'solution', 'solution.py')    
     log_file_name = 'test.log'
     status = "FAILED"
 
