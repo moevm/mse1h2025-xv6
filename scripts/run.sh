@@ -19,7 +19,7 @@ show_help() {
     echo "Использование: ./run.sh [КЛЮЧ]... [ЦЕЛЬ]..."
     echo "Ключи (флаги):"
     echo "  --help             Вывод этой инструкции"
-    echo "  --validate [LAB] [ARCHIVE]  Загрузить решение"
+    echo "  --load [LAB] [ARCHIVE]  Загрузить решение"
     echo "  --test [LAB] [ARCHIVE]      Проверить решение"
     echo "  --report [LAB] [ARCHIVE]    Показать результаты проверки"
     echo "Цели:"
@@ -58,7 +58,7 @@ check_archive_exists() {
     fi
 }
 
-validate_solution() {
+load_solution() {
     local lab=$1
     local archive=$2
     local log_file="$LOGS_DIR/$lab/$archive.log"
@@ -83,7 +83,7 @@ test_solution() {
     local report_file="result.json"
 
     if [[ ! -f "$log_file" ]]; then
-        echo "Ошибка: Решение не было загружено. Сначала выполните --validate."
+        echo "Ошибка: Решение не было загружено. Сначала выполните --load."
         exit 1
     fi
 
@@ -133,14 +133,14 @@ case "$1" in
     --help)
         show_help
         ;;
-    --validate)
+    --load)
         if [[ $# -ne 3 ]]; then
             echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
             exit 1
         fi
         is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
         check_archive_exists "$3"
-        validate_solution "$2" "$3"
+        load_solution "$2" "$3"
         ;;
     --test)
         if [[ $# -ne 3 ]]; then
