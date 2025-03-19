@@ -19,15 +19,22 @@ try:
 except ImportError:
     rarfile = None
 
-log_file = 'lab_prepare.log'
+# путь к папке scripts
+script_dir = Path(__file__).resolve().parent
+
+logs_dir = script_dir.parent / 'logs'
+logs_dir.mkdir(parents=True, exist_ok=True)  #создаём папку logs, если нет
+
+log_file = logs_dir / 'load.log'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_file),
+        logging.FileHandler(log_file, mode='w'),  #перезаписывать каждый запуск
         logging.StreamHandler(sys.stdout)
     ]
 )
+logging.info(f"Logging to {log_file}")
 
 def extract_archive(archive_path, extract_to):
     logging.info(f"Extracting archive: {archive_path}")
@@ -137,12 +144,18 @@ def main():
         else:
             logging.warning("No patch found. Skipping patch application.")
 
-        output_dir = Path.cwd() / 'lab_ready'
+        #папка lab_ready создаётся на одном уровне с scripts
+        output_dir = script_dir.parent / 'lab_ready'
+        logging.info(f"Output directory set to: {output_dir}")
+
         if output_dir.exists():
             shutil.rmtree(output_dir)
         shutil.copytree(temp_dir, output_dir)
 
         logging.info(f"Lab work successfully prepared in: {output_dir}")
+        logging.info(f"Script directory: {script_dir}")
+        logging.info(f"Lab ready directory: {output_dir}")
 
 if __name__ == '__main__':
     main()
+
