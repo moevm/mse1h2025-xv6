@@ -1,14 +1,18 @@
 services:
   app:
     build:
-      context: .           # Контекст указывает на текущую директорию
-      dockerfile: Dockerfile # Имя файла Dockerfile
+      context: ..           # Контекст указывает на текущую директорию
+      dockerfile: docker/Dockerfile # Имя файла Dockerfile
     ports:
       - "${PORT:-5000}:5000"  # Указываем порт через переменную окружения, по умолчанию 5000
     environment:
       - HOST=${HOST:-"0.0.0.0"} # Добавлено значение по умолчанию для HOST
+      - PYTHONPATH=/app # Для импорта модулей
     volumes:
-      - .:/usr/src/app    # Монтируем текущую директорию в контейнер
-    command: ["sh", "-c", "sh /usr/src/app/script.sh"] # Команда для запуска
+      - ../solution:/app/solution
+      - ../tests:/app/tests
+      - ../logs:/app/logs
+      - ../users:/app/users
+    command: ${ARGS} # Команда для запуска
     restart: always
 
