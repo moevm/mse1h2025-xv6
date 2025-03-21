@@ -5,23 +5,26 @@ import threading
 from datetime import datetime
 from subprocess import TimeoutExpired
 
-
-TARGET_DIR = "../xv6-labs-2024"    # Целевая директория для выполнения команд
-COMMAND = ["make", "grade"]        # Команда для выполнения
-LOG_FILE = "qemu-gdb.log"          # Имя файла для записи логов
-START_LOGGING_STR = "make[1]: выход из каталога"  # Строка-триггер для начала логирования
-
+TARGET_DIR = "../lab_ready"    # Папка, где ищем Makefile
+COMMAND = ["make", "grade"]    # Команда для выполнения
+LOG_FILE = "qemu-gdb.log"      # Файл логов
+START_LOGGING_STR = "make[1]: выход из каталога"  # Строка-триггер для логов
 
 def get_script_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
+def find_makefile_dir(start_dir):
+    """
+    Рекурсивно ищет директорию с Makefile
+    """
+    for dirpath, dirnames, filenames in os.walk(start_dir):
+        if 'Makefile' in filenames:
+            return dirpath
+    return None
+
 def read_stream(stream, stream_type, log_file, trigger_str):
     """
-    Чтение потока вывода процесса
-    :param stream: Поток вывода (stdout/stderr)
-    :param stream_type: Тип потока для маркировки
-    :param log_file: Файловый объект для записи логов
-    :param trigger_str: Строка-триггер для активации логирования
+    Чтение вывода процесса и логирование
     """
     trigger_count = 0
     logging_enabled = False
@@ -32,12 +35,12 @@ def read_stream(stream, stream_type, log_file, trigger_str):
             break
         decoded_line = line.decode(errors='replace').rstrip()
 
-        # Активация логирования после второго обнаружения триггерной строки
+        # Включение логирования после двух появлений триггера
         if trigger_str in decoded_line:
             trigger_count += 1
             if trigger_count == 2:
                 logging_enabled = True
-                log_file.write(f"[{datetime.now().isoformat()} {stream_type}] === НАЧАЛО ЛОГИРОВАНИЯ ===\n")
+                log_file.write(f"[{datetime.now().isoformat()} {stream_type}] === LOGGING STARTED ===\n")
             continue
 
         if logging_enabled:
@@ -45,38 +48,51 @@ def read_stream(stream, stream_type, log_file, trigger_str):
             log_file.write(log_entry)
             print(decoded_line)
 
-
 def main():
-    timeout = 300  
+    timeout = 300  # Таймаут процесса
     script_dir = get_script_dir()
-    log_path = os.path.join(script_dir, LOG_FILE)
+    parent_dir = os.path.abspath(os.path.join(script_dir, ".."))  
 
-    try:
-        # Переход в целевую рабочую директорию
-        target_path = os.path.abspath(os.path.join(script_dir, TARGET_DIR))
-        os.chdir(target_path)
-    except Exception as e:
-        error_msg = f"Ошибка перехода в директорию {target_path}: {str(e)}"
+    log_dir = os.path.join(parent_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, LOG_FILE)
+
+    # Поиск директории с Makefile
+    lab_ready_path = os.path.abspath(os.path.join(script_dir, TARGET_DIR))
+    makefile_dir = find_makefile_dir(lab_ready_path)
+
+    if not makefile_dir:
+        error_msg = f"Makefile not found {lab_ready_path}"
         print(error_msg)
         with open(log_path, "a") as f:
             f.write(f"[ERROR] {datetime.now().isoformat()} {error_msg}\n")
         sys.exit(1)
 
-    print(f"Лог-файл: {log_path}\nРабочая директория: {os.getcwd()}")
+    # Переход в директорию с Makefile
+    try:
+        os.chdir(makefile_dir)
+    except Exception as e:
+        error_msg = f"Error switching to directory {makefile_dir}: {str(e)}"
+        print(error_msg)
+        with open(log_path, "a") as f:
+            f.write(f"[ERROR] {datetime.now().isoformat()} {error_msg}\n")
+        sys.exit(1)
+
+    print(f"Лог-файл: {log_path}\nWorking directory: {os.getcwd()}")
 
     try:
         with open(log_path, "a", buffering=1) as log_file:
-            # Запись заголовка запуска
-            log_file.write(f"\n{'='*50}\nНовый запуск {datetime.now().isoformat()}\n{'='*50}\n")
+            # Заголовок запуска
+            log_file.write(f"\n{'='*50}\New start {datetime.now().isoformat()}\n{'='*50}\n")
             
-            # Запуск целевого процесса
+            # Запуск процесса
             proc = subprocess.Popen(
                 COMMAND,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
 
-            # Создание потоков для чтения выводов
+            # Потоки для чтения вывода
             stdout_thread = threading.Thread(
                 target=read_stream,
                 args=(proc.stdout, "STDOUT", log_file, START_LOGGING_STR)
@@ -86,15 +102,14 @@ def main():
                 args=(proc.stderr, "STDERR", log_file, START_LOGGING_STR)
             )
             
-            # Старт потоков
             stdout_thread.start()
             stderr_thread.start()
 
-            # Ожидание завершения процесса с таймаутом
+            # Ожидание процесса
             try:
                 proc.wait(timeout=timeout)
             except TimeoutExpired:
-                log_file.write(f"[TIMEOUT] {datetime.now().isoformat()} Таймаут 5 минут\n")
+                log_file.write(f"[TIMEOUT] {datetime.now().isoformat()} Timeout: 5 minutes\n")
                 proc.terminate()
                 try:
                     proc.wait(timeout=5)
@@ -103,26 +118,25 @@ def main():
                     proc.kill()
                     proc.wait()
 
-            # Завершение потоков
             stdout_thread.join(timeout=1)
             stderr_thread.join(timeout=1)
 
     except KeyboardInterrupt:
         with open(log_path, "a") as f:
-            f.write(f"[INTERRUPTED] {datetime.now().isoformat()} Пользователь прервал выполнение\n")
-        print("\nПрерывание пользователем")
+            f.write(f"[INTERRUPTED] {datetime.now().isoformat()} User interrupted execution\n")
+        print("\nUser interruption")
         sys.exit(1)
     except Exception as e:
         with open(log_path, "a") as f:
             f.write(f"[CRITICAL] {datetime.now().isoformat()} {str(e)}\n")
-        print(f"Критическая ошибка: {str(e)}")
+        print(f"A critical error has occurred: {str(e)}")
         sys.exit(1)
 
-    # Запись финального статуса
+    # Финальный статус
     exit_code = proc.returncode
-    status = "УСПЕШНО" if exit_code == 0 else f"ОШИБКА ({exit_code})"
+    status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
     with open(log_path, "a") as f:
-        f.write(f"[FINISHED] {datetime.now().isoformat()} Завершено со статусом: {status}\n")
+        f.write(f"[FINISHED] {datetime.now().isoformat()} Finished with status: {status}\n")
     
     sys.exit(exit_code)
 
