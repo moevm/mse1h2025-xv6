@@ -10,19 +10,18 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /usr/src/app
+WORKDIR /app
 
-WORKDIR /usr/src/app
+COPY scripts /app/scripts
 
-COPY requirements.txt .
+RUN chmod +x /app/scripts/run.sh && \
+    chown -R root:root /app/scripts
 
-RUN python3 -m venv venv
+COPY docker/requirements.txt .
 
-RUN . venv/bin/activate && pip install --no-cache-dir -r requirements.txt
+RUN python3 -m venv venv && \
+    . venv/bin/activate && \
+    pip install --no-cache-dir -r requirements.txt
 
-COPY script.sh .
-
-RUN chmod +x script.sh
-
-CMD ["./script.sh"]  
+ENTRYPOINT ["/app/scripts/run.sh"]
 
