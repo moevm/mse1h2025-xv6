@@ -8,7 +8,7 @@ RESULTS_DIR="$LOGS_DIR"
 SCRIPTS_DIR="$BASE_DIR/scripts" 
 
 if [[ $# -lt 1 ]]; then
-    echo "Ошибка: Не указаны параметры. Используйте --help для справки."
+    echo "Error: Parameters are not specified. Use --help for reference."
     exit 1
 fi
 
@@ -52,7 +52,7 @@ is_valid_archive() {
 check_archive_exists() {
     local archive=$1
     if [[ ! -f "$archive" ]]; then
-        echo "Ошибка: Архив '$archive' не найден."
+        echo "Error: Archive '$archive' not found."
         exit 1
     fi
 }
@@ -67,11 +67,11 @@ load_and_test_solution() {
     mkdir -p "$LOGS_DIR"
 
     echo "Uploading the solution..."
-    is_valid_archive "$archive" || { echo "Ошибка: Архив $archive должен быть в формате .zip, .rar, .7z или .tar"; exit 1; }
+    is_valid_archive "$archive" || { echo "Error: The archive $archive must be in the format .zip, .rar, .7z or .tar"; exit 1; }
 
     python3 "$SCRIPTS_DIR/load.py" "$archive" >> "$log_file" 2>&1
     if [[ $? -ne 0 ]]; then
-        echo "Ошибка при загрузке решения. Подробности в логе: $log_file"
+        echo "Error loading the solution. Details in the log: $log_file"
         exit 1
     fi
 
@@ -97,7 +97,7 @@ show_report() {
     local report_file="$LOGS_DIR/$archive_name.log"
 
     if [[ ! -f "$report_file" ]]; then
-        echo "Ошибка: Файл отчета $report_file не найден."
+        echo "Error: The report file $report_file not found."
         exit 1
     fi
 
@@ -114,24 +114,24 @@ case "$1" in
         ;;
     --validate)
         if [[ $# -ne 3 ]]; then
-            echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
+            echo "Error: Incorrect parameters are specified. Use --help for reference."
             exit 1
         fi
-        is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
+        is_valid_lab "$2" || { echo "Error: A non-existent laboratory work is indicated"; exit 1; }
         check_archive_exists "$3"
         load_and_test_solution "$2" "$3"
         ;;
     --report)
         if [[ $# -ne 3 ]]; then
-            echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
+            echo "Error: Incorrect parameters are specified. Use --help for reference."
             exit 1
         fi
-        is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
+        is_valid_lab "$2" || { echo "Error: A non-existent laboratory work is indicated"; exit 1; }
         check_archive_exists "$3"
         show_report "$2" "$3"
         ;;
     *)
-        echo "Ошибка: Неизвестный флаг '$1'. Используйте --help для справки."
+        echo "Error: Unknown flag '$1'. Use --help for reference."
         exit 1
         ;;
 esac
