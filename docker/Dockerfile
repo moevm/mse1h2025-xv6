@@ -17,11 +17,5 @@ COPY scripts /app/scripts
 RUN chmod +x /app/scripts/run.sh && \
     chown -R root:root /app/scripts
 
-COPY docker/requirements.txt .
-
-RUN python3 -m venv venv && \
-    . venv/bin/activate && \
-    pip install --no-cache-dir -r requirements.txt
-
 ENTRYPOINT ["/app/scripts/run.sh"]
 

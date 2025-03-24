@@ -12,7 +12,6 @@ services:
       - ../solution:/app/solution
       - ../tests:/app/tests
       - ../logs:/app/logs
-      - ../users:/app/users
     command: ${ARGS} # Команда для запуска
     restart: always
 
