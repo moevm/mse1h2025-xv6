@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     logger.info(f"Starting file check in 'user' folders within: {lab_ready_path}")
 
-    valid_extensions = ['.c', '.h', '.txt', '.py']  #разрешённые расширения файлов
+    valid_extensions = ['.c', '.h', '.txt', '.py', '.S', '.ld', '.pl', '.sh']  #разрешённые расширения файлов
 
     errors = validate_files(lab_ready_path, valid_extensions, logger)  #проверка файлов
 
