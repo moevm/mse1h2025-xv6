@@ -1,34 +1,33 @@
 #!/bin/bash
 
 VALID_LABS=("util" "syscall" "pgtbl" "traps" "cow" "net" "lock" "fs" "mmap")
-BASE_DIR=$(realpath "$(dirname "$0")")  
+BASE_DIR=$(realpath "$(dirname "$0")/..") 
 LOGS_DIR="$BASE_DIR/logs"
 SOLUTION_DIR="$BASE_DIR/solution"
 RESULTS_DIR="$LOGS_DIR"
+SCRIPTS_DIR="$BASE_DIR/scripts" 
 
 if [[ $# -lt 1 ]]; then
-    echo "Ошибка: Не указаны параметры. Используйте --help для справки."
+    echo "Error: Parameters are not specified. Use --help for reference."
     exit 1
 fi
 
 show_help() {
     echo "=================================================="
-    echo "            Автоматизированная система   "
-    echo "            проверки решений Lab 6.828   "
+    echo "                 Automated system"
+    echo "            verification of Lab 6.828"
     echo "=================================================="
-    echo "Использование: ./run.sh [КЛЮЧ]... [ЦЕЛЬ]..."
-    echo "Ключи (флаги):"
-    echo "  --help             Вывод этой инструкции"
-    echo "  --load [LAB] [ARCHIVE]  Загрузить решение"
-    echo "  --test [LAB] [ARCHIVE]      Проверить решение"
-    echo "  --report [LAB] [ARCHIVE]    Показать результаты проверки"
-    echo "Цели:"
-    echo "  [LAB] - название лабораторной работы"
-    echo "  [ARCHIVE] - название загруженного архива"
-    echo "Список названий лабораторных работ:"
+    echo "USE: ./run.sh [KEYS]... [TARGET]..."
+    echo "KEYS (flags):"
+    echo "  --help             The output of this instruction"
+    echo "  --validate [1] [2] Download and verify the solution"
+    echo "  --report [1] [2]   Show the verification results"
+    echo "PURPOSE:"
+    echo "  [1] _the_name_of_the_lab_"
+    echo "  [2] _the_name_of_the_uploaded_archive_"
+    echo "List of laboratory work names:"
     echo "  ${VALID_LABS[*]}"
     echo "=================================================="
-    exit 0
 }
 
 is_valid_lab() {
@@ -52,116 +51,92 @@ is_valid_archive() {
 
 check_archive_exists() {
     local archive=$1
-    if [[ ! -f "$BASE_DIR/$archive" ]]; then
-        echo "Ошибка: Архив '$archive' не найден в $BASE_DIR."
+    if [[ ! -f "$archive" ]]; then
+        echo "Error: Archive '$archive' not found."
         exit 1
     fi
 }
 
-load_solution() {
+prepare_grade_script() {
     local lab=$1
-    local archive=$2
-    local log_file="$LOGS_DIR/$lab/$archive.log"
-
-    is_valid_archive "$archive" || { echo "Ошибка: Архив $archive должен быть в формате .zip, .rar, .7z или .tar"; exit 1; }
-
-    mkdir -p "$LOGS_DIR/$lab"
-    echo "Загрузка решения..." | tee "$log_file"
-    python3 "$BASE_DIR/load.py" "$BASE_DIR/$archive" >> "$log_file" 2>&1
-    if [[ $? -ne 0 ]]; then
-        echo "Ошибка при загрузке решения. Подробности в логе: $log_file"
-        exit 1
-    fi
-
-    echo "Файл успешно загружен!" | tee -a "$log_file"
+    file=$(find ./lab_ready -type f -name "grade-lab-*${lab}*" -print -quit)
+    chmod +x "$file"
 }
 
-test_solution() {
+load_and_test_solution() {
     local lab=$1
     local archive=$2
-    local log_file="$LOGS_DIR/$lab/$archive.log"
-    local report_file="result.json"
+    local archive_name=$(basename "$archive")
+    local log_file="$LOGS_DIR/$archive_name.log"
+    local report_file="$LOGS_DIR/$archive_name.json"
 
-    if [[ ! -f "$log_file" ]]; then
-        echo "Ошибка: Решение не было загружено. Сначала выполните --load."
-        exit 1
-    fi
+    mkdir -p "$LOGS_DIR"
 
-    echo "Выполнение тривиальных проверок..." | tee -a "$log_file"
-    python3 "$BASE_DIR/file_checker.py" >> "$log_file" 2>&1
+    echo "Uploading the solution..."
+    is_valid_archive "$archive" || { echo "Error: The archive $archive must be in the format .zip, .rar, .7z or .tar"; exit 1; }
+
+    python3 "$SCRIPTS_DIR/load.py" "$archive" >> "$log_file" 2>&1
     if [[ $? -ne 0 ]]; then
-        echo "Ошибка: Файл не прошел тривиальные проверки. Подробности в логе: $log_file"
+        echo "Error loading the solution. Details in the log: $log_file"
         exit 1
     fi
 
-    echo "Проверка решения..." | tee -a "$log_file"
-    python3 "$BASE_DIR/run_tests.py" >> "$log_file" 2>&1
+    echo "The file has been uploaded successfully!"
+
+    echo "Checking the solution..."
+    echo "Trivial checks: " >> "$log_file"
+    prepare_grade_script "$lab"
+    python3 "$SCRIPTS_DIR/file_checker.py" >> "$log_file" 2>&1
+    python3 "$SCRIPTS_DIR/run_tests.py" >> "$log_file" 2>&1
+    python3 "$SCRIPTS_DIR/generate_report.py" >> "$log_file" 2>&1
+
     if [[ -f "$BASE_DIR/test.log" ]]; then
         cat "$BASE_DIR/test.log" >> "$log_file"
     fi
-    if [[ $? -ne 0 ]]; then
-        echo "Ошибка: Не удалось запустить тесты. Подробности в логе: $log_file"
-        exit 1
-    fi
-
-    echo "Генерация отчета..." | tee -a "$log_file"
-    python3 "$BASE_DIR/generate_report.py" >> "$log_file" 2>&1
-    if [[ $? -ne 0 ]]; then
-        echo "Ошибка: Не удалось сгенерировать отчет. Подробности в логе: $log_file"
-        exit 1
-    fi
-    printf "0r %s\nw\n" "$log_file" | ed -s "$report_file" >/dev/null 2>&1
-    echo "Результаты проверки сохранены в файл $log_file" | tee -a "$log_file"
+    echo "Checking the performance of laboratory work: " >> "$log_file"
+    echo "The results of the check are saved to a file \"$report_file\"."
 }
 
 show_report() {
-    local report_file="result.json"
+    local lab=$1
+    local archive=$2
+    local archive_name=$(basename "$archive")
+    local report_file="$LOGS_DIR/$archive_name.log"
 
     if [[ ! -f "$report_file" ]]; then
-        echo "Ошибка: Файл отчета $report_file не найден."
+        echo "Error: The report file $report_file not found."
         exit 1
     fi
 
-    echo "Содержимое result.json:"
+    echo "Found the file \"$report_file\"."
+    echo "Checking the archive format:"
     cat "$report_file"
-    
 }
-
-
 
 case "$1" in
     --help)
         show_help
         ;;
-    --load)
+    --validate)
         if [[ $# -ne 3 ]]; then
-            echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
+            echo "Error: Incorrect parameters are specified. Use --help for reference."
             exit 1
         fi
-        is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
+        is_valid_lab "$2" || { echo "Error: A non-existent laboratory work is indicated"; exit 1; }
         check_archive_exists "$3"
-        load_solution "$2" "$3"
-        ;;
-    --test)
-        if [[ $# -ne 3 ]]; then
-            echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
-            exit 1
-        fi
-        is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
-        check_archive_exists "$3"
-        test_solution "$2" "$3"
+        load_and_test_solution "$2" "$3"
         ;;
     --report)
         if [[ $# -ne 3 ]]; then
-            echo "Ошибка: Указаны неверные параметры. Используйте --help для справки."
+            echo "Error: Incorrect parameters are specified. Use --help for reference."
             exit 1
         fi
-        is_valid_lab "$2" || { echo "Ошибка: Указана несуществующая лабораторная работа"; exit 1; }
+        is_valid_lab "$2" || { echo "Error: A non-existent laboratory work is indicated"; exit 1; }
         check_archive_exists "$3"
         show_report "$2" "$3"
         ;;
     *)
-        echo "Ошибка: Неизвестный флаг '$1'. Используйте --help для справки."
+        echo "Error: Unknown flag '$1'. Use --help for reference."
         exit 1
         ;;
 esac
