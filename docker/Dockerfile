@@ -6,6 +6,11 @@ RUN apt-get update && apt-get install -y \
     git \
     gcc \
     make \
+    build-essential \
+    gdb-multiarch \
+    qemu-system-misc \
+    gcc-riscv64-linux-gnu \
+    binutils-riscv64-linux-gnu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
