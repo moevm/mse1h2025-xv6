@@ -1,10 +1,10 @@
 # Сборка Docker-образа и запуск контейнера
 build:
-	docker-compose up --build
+	docker-compose -f docker-compose.yml build
     
 # Запуск контейнера
 run:
-	docker-compose up
+	docker-compose -f docker-compose.yml run --rm app $(ARGS)
 
 # Остановка и удаление контейнера
 clean:
