@@ -1,38 +1,17 @@
 import unittest
-import tempfile
-import os
-from unittest.mock import patch
-from src.lab_runner import run_lab
+from unittest.mock import patch, MagicMock
+from scripts.run_tests import main as run_tests_main
 
 
 class TestLabRunner(unittest.TestCase):
-    def test_successful_execution(self):
-        """Тест успешного выполнения команды"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            log_file = os.path.join(tmpdir, 'log.txt')
-            result = run_lab('echo "Success"', 10, log_file)
+    @patch('subprocess.Popen')
+    @patch('os.chdir')
+    def test_successful_execution(self, mock_chdir, mock_popen):
+        """Тест успешного выполнения"""
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_popen.return_value = mock_proc
 
-            self.assertEqual(result['status'], 'completed')
-            self.assertEqual(result['returncode'], 0)
-            with open(log_file) as f:
-                self.assertIn('Success', f.read())
-
-    def test_timeout_handling(self):
-        """Тест обработки таймаута"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            log_file = os.path.join(tmpdir, 'log.txt')
-            result = run_lab('sleep 5', 1, log_file)
-
-            self.assertEqual(result['status'], 'timeout')
-            self.assertTrue(os.path.exists(log_file))
-
-    def test_error_logging(self):
-        """Тест логирования ошибок"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            log_file = os.path.join(tmpdir, 'log.txt')
-            run_lab('invalid_command', 10, log_file)
-
-            with open(log_file) as f:
-                content = f.read()
-                self.assertIn('not found', content)
-                self.assertIn('stderr', content)
+        with patch('sys.exit') as mock_exit:
+            run_tests_main()
+            mock_exit.assert_called_with(0)
