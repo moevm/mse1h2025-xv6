@@ -60,6 +60,10 @@ check_archive_exists() {
 prepare_grade_script() {
     local lab=$1
     file=$(find ./lab_ready -type f -name "grade-lab-*${lab}*" -print -quit)
+    if [[ -z "$file" ]]; then
+        echo "Error: No grading script found for lab $lab." | tee -a "$LOGS_DIR/error.log"
+        exit 1
+    fi
     chmod +x "$file"
 }
 
@@ -73,11 +77,11 @@ load_and_test_solution() {
     mkdir -p "$LOGS_DIR"
 
     echo "Uploading the solution..."
-    is_valid_archive "$archive" || { echo "Error: The archive $archive must be in the format .zip, .rar, .7z or .tar"; exit 1; }
+    is_valid_archive "$archive" || { echo "Error: The archive $archive must be in the format .zip, .rar, .7z or .tar" | tee -a "$log_file"; exit 1; }
 
     python3 "$SCRIPTS_DIR/load.py" "$archive" >> "$log_file" 2>&1
     if [[ $? -ne 0 ]]; then
-        echo "Error loading the solution. Details in the log: $log_file"
+        echo "Error loading the solution. Details in the log: $log_file" | tee -a "$log_file"
         exit 1
     fi
 
@@ -86,9 +90,24 @@ load_and_test_solution() {
     echo "Checking the solution..."
     echo "Trivial checks: " >> "$log_file"
     prepare_grade_script "$lab"
+
     python3 "$SCRIPTS_DIR/file_checker.py" >> "$log_file" 2>&1
+    if [[ $? -ne 0 ]]; then
+        echo "Error: file_checker failed. See $log_file for details." | tee -a "$log_file"
+        exit 1
+    fi
+
     python3 "$SCRIPTS_DIR/run_tests.py" >> "$log_file" 2>&1
+    if [[ $? -ne 0 ]]; then
+        echo "Error: run_tests failed. See $log_file for details." | tee -a "$log_file"
+        exit 1
+    fi
+
     python3 "$SCRIPTS_DIR/generate_report.py" >> "$log_file" 2>&1
+    if [[ $? -ne 0 ]]; then
+        echo "Error: generate_report failed. See $log_file for details." | tee -a "$log_file"
+        exit 1
+    fi
 
     if [[ -f "$BASE_DIR/test.log" ]]; then
         cat "$BASE_DIR/test.log" >> "$log_file"
