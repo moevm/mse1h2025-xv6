@@ -25,8 +25,14 @@ show_help() {
     echo "PURPOSE:"
     echo "  [1] _the_name_of_the_lab_"
     echo "  [2] _the_name_of_the_uploaded_archive_"
+    echo " "
     echo "List of laboratory work names:"
     echo "  ${VALID_LABS[*]}"
+    echo " "
+    echo "Valid archive format:"
+    echo " .zip, .tar, .gz, .tgz, .tar.gz, .7z, .rar"
+    echo " "
+    echo "The archive must contain the entire contents of the folder \"xv6-labs-2024/\" – the folder of the cloned (\"git clone git://g.csail.mit.edu/xv6-labs-2024\") for performing laboratory work of the repository, with the completed laboratory work (all necessary added files in the folder \"xv6-labs-2024/user/\")."
     echo "=================================================="
 }
 
@@ -38,15 +44,6 @@ is_valid_lab() {
         fi
     done
     return 1
-}
-
-is_valid_archive() {
-    local archive=$1
-    if [[ "$archive" =~ \.(zip|rar|7z|tar)$ ]]; then
-        return 0
-    else
-        return 1
-    fi
 }
 
 check_archive_exists() {
@@ -71,12 +68,12 @@ load_and_test_solution() {
     local report_file="$LOGS_DIR/$archive_name.json"
 
     mkdir -p "$LOGS_DIR"
+    rm -f "$LOGS_DIR/load.log" "$LOGS_DIR/file_checker.log" "$LOGS_DIR/qemu-gdb.log"
 
     echo "Uploading the solution..."
-    is_valid_archive "$archive" || { echo "Error: The archive $archive must be in the format .zip, .rar, .7z or .tar"; exit 1; }
-
-    python3 "$SCRIPTS_DIR/load.py" "$archive" >> "$log_file" 2>&1
+    python3 "$SCRIPTS_DIR/load.py" "$archive"
     if [[ $? -ne 0 ]]; then
+    	python3 "$SCRIPTS_DIR/generate_report.py" $archive_name
         echo "Error loading the solution. Details in the log: $log_file"
         exit 1
     fi
@@ -84,16 +81,14 @@ load_and_test_solution() {
     echo "The file has been uploaded successfully!"
 
     echo "Checking the solution..."
-    echo "Trivial checks: " >> "$log_file"
     prepare_grade_script "$lab"
-    python3 "$SCRIPTS_DIR/file_checker.py" >> "$log_file" 2>&1
-    python3 "$SCRIPTS_DIR/run_tests.py" >> "$log_file" 2>&1
-    python3 "$SCRIPTS_DIR/generate_report.py" >> "$log_file" 2>&1
+    python3 "$SCRIPTS_DIR/file_checker.py"
+    python3 "$SCRIPTS_DIR/run_tests.py"
+    python3 "$SCRIPTS_DIR/generate_report.py" $archive_name
 
     if [[ -f "$BASE_DIR/test.log" ]]; then
         cat "$BASE_DIR/test.log" >> "$log_file"
     fi
-    echo "Checking the performance of laboratory work: " >> "$log_file"
     echo "The results of the check are saved to a file \"$report_file\"."
 }
 
