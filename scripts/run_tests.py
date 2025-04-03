@@ -58,7 +58,7 @@ def read_stream(stream, stream_type, trigger_str):
                 logging.error(decoded_line)
             else:
                 logging.info(decoded_line)
-            print(decoded_line)
+            # print(decoded_line)
 
 def main():
     timeout = 300 # Таймаут процесса
@@ -72,7 +72,7 @@ def main():
     
     if not makefile_dir:
         error_msg = f"Makefile not found {lab_ready_path}"
-        print(error_msg)
+        # print(error_msg)
         logging.error(error_msg)
         sys.exit(1)
     
@@ -81,11 +81,11 @@ def main():
         os.chdir(makefile_dir)
     except Exception as e:
         error_msg = f"Error switching to directory {makefile_dir}: {str(e)}"
-        print(error_msg)
+        # print(error_msg)
         logging.error(error_msg)
         sys.exit(1)
     
-    print(f"Лог-файл: {log_path}\nWorking directory: {os.getcwd()}")
+    # print(f"Лог-файл: {log_path}\nWorking directory: {os.getcwd()}")
     
     try:
         # Заголовок запуска
@@ -117,11 +117,11 @@ def main():
     
     except KeyboardInterrupt:
         logging.warning("User interrupted execution")
-        print("\nUser interruption")
+        # print("\nUser interruption")
         sys.exit(1)
     except Exception as e:
         logging.critical(f"Critical error: {e}")
-        print(f"A critical error has occurred: {str(e)}")
+        # print(f"A critical error has occurred: {str(e)}")
         sys.exit(1)
     
     # Финальный статус
