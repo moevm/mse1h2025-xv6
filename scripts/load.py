@@ -31,7 +31,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(log_file, mode='w'),  #перезаписывать каждый запуск
-        logging.StreamHandler(sys.stdout)
+        # logging.StreamHandler(sys.stdout) # It is just superfluous
     ]
 )
 logging.info(f"Logging to {log_file}")
