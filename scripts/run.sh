@@ -57,6 +57,11 @@ check_archive_exists() {
 prepare_grade_script() {
     local lab=$1
     file=$(find ./lab_ready -type f -name "grade-lab-*${lab}*" -print -quit)
+    if [[ -z "$file" ]]; then
+        echo "Error: No grading script found for lab $lab." | tee -a "$LOGS_DIR/error.log"
+        python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
+        exit 1
+    fi
     chmod +x "$file"
 }
 
@@ -67,27 +72,43 @@ load_and_test_solution() {
     local log_file="$LOGS_DIR/$archive_name.log"
     local report_file="$LOGS_DIR/$archive_name.json"
 
+    # Создание дирректории с log-файлами и очистка старых логов в случае, если они уже существовали
     mkdir -p "$LOGS_DIR"
-    rm -f "$LOGS_DIR/load.log" "$LOGS_DIR/file_checker.log" "$LOGS_DIR/qemu-gdb.log"
+    rm -f "$LOGS_DIR/load.log" "$LOGS_DIR/file_checker.log" "$LOGS_DIR/qemu-gdb.log" "$LOGS_DIR/error.log"
 
+    # load.py
     echo "Uploading the solution..."
     python3 "$SCRIPTS_DIR/load.py" "$archive"
     if [[ $? -ne 0 ]]; then
-    	python3 "$SCRIPTS_DIR/generate_report.py" $archive_name
-        echo "Error loading the solution. Details in the log: $log_file"
+        echo "Error loading the solution. Details in the log: $log_file" | tee -a "$LOGS_DIR/error.log"
+        python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
         exit 1
     fi
-
     echo "The file has been uploaded successfully!"
 
+    # file_checker.py
     echo "Checking the solution..."
     prepare_grade_script "$lab"
     python3 "$SCRIPTS_DIR/file_checker.py"
-    python3 "$SCRIPTS_DIR/run_tests.py"
-    python3 "$SCRIPTS_DIR/generate_report.py" $archive_name
+    if [[ $? -ne 0 ]]; then
+        echo "Error: file_checker failed. See $log_file for details." | tee -a "$LOGS_DIR/error.log"
+        python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
+        exit 1
+    fi
 
-    if [[ -f "$BASE_DIR/test.log" ]]; then
-        cat "$BASE_DIR/test.log" >> "$log_file"
+    # run_tests.py
+    python3 "$SCRIPTS_DIR/run_tests.py"
+    if [[ $? -ne 0 ]]; then
+        echo "Error: run_tests failed. See $log_file for details." | tee -a "$LOGS_DIR/error.log"
+        python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
+        exit 1
+    fi
+
+    # generate_report.py
+    python3 "$SCRIPTS_DIR/generate_report.py"
+    if [[ $? -ne 0 ]]; then
+        echo "Error: generate_report failed. See $log_file for details." | tee -a "$log_file"
+        exit 1
     fi
     echo "The results of the check are saved to a file \"$report_file\"."
 }
