@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import logging
 import json
+import re
 
 # Пути к дирректориям
 script_dir = Path(__file__).resolve().parent
@@ -30,7 +31,7 @@ logging.basicConfig(
 )
 
 # Список log-файлов для объединение в log_file
-log_files_to_merge = ["load.log", "file_checker.log", "qemu-gdb.log"]
+log_files_to_merge = ["load.log", "file_checker.log", "qemu-gdb.log", "error.log"]
 
 # Открытие log_file на запись и добавление содержимого других логов
 with open(log_file, 'w') as output_log:
@@ -49,22 +50,25 @@ with open(log_file, 'w') as output_log:
             logging.error(f"Error while reading {file}: {e}")
             
 
-def analyze_log(file_path):
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            logs = file.read()
-            if "FAILED" in logs:
-                return {"status": "FAIL", "score": 0}
-            elif "PASSED" in logs:
-                return {"status": "PASS", "score": 100}
-            else:
-                return {"status": "UNKNOWN", "score": 0}
-    except FileNotFoundError:
-        return {"status": "ERROR", "score": 0, "message": "test.log not found"}
+# Преобразование log-файла в формат .json
+with open(log_file, 'r', encoding='utf-8') as log_file_r:
+    log_lines = log_file_r.readlines()
 
-def save_result(data, output_file):
-    with open(output_file, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=4)
+def parse_log_line(line):
+    regex = r'([\d-]+\s[\d:,]+) - (\w+) - (.+)'
+    match = re.match(regex, line.strip())
+    if match:
+        timestamp, level, message = match.groups()
+        return {
+            "timestamp": timestamp,
+            "level": level,
+            "message": message
+        }
+    else:
+        return None
 
-result = analyze_log(log_file)
-save_result(result, report_file)
+log_entries = [parse_log_line(line) for line in log_lines if line.strip()]
+log_entries = [entry for entry in log_entries if entry is not None]
+
+with open(report_file, 'w', encoding='utf-8') as json_file:
+    json.dump(log_entries, json_file, ensure_ascii=False, indent=4)
