@@ -105,7 +105,7 @@ load_and_test_solution() {
     fi
 
     # generate_report.py
-    python3 "$SCRIPTS_DIR/generate_report.py"
+    python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
     if [[ $? -ne 0 ]]; then
         echo "Error: generate_report failed. See $log_file for details." | tee -a "$log_file"
         exit 1
