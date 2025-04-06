@@ -42,7 +42,7 @@ with open(log_file, 'w') as output_log:
             output_log.write("\nChecking the performance of laboratory work:\n")
         file_path = logs_dir / file
         try:
-            with open(file_path, 'r') as input_log:
+            with open(file_path, 'r', encoding='utf-8') as input_log:
                 output_log.write(input_log.read())
         except FileNotFoundError:
             logging.warning(f"File {file} is not found")
