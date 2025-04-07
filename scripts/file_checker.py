@@ -6,7 +6,7 @@ from datetime import datetime
 def setup_logger(logs_dir):
     os.makedirs(logs_dir, exist_ok=True)  #создание папки для логов, если её нет
 
-    log_filename = "file_checker_log.log"  #название файла лога
+    log_filename = "file_checker.log"  #название файла лога
     log_path = os.path.join(logs_dir, log_filename)  #путь к файлу лога
 
     logger = logging.getLogger('FileChecker')  #создание логгера
@@ -19,7 +19,7 @@ def setup_logger(logs_dir):
     stream_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))  #формат для консоли
 
     logger.addHandler(file_handler)  #добавляем обработчик в логгер
-    logger.addHandler(stream_handler)  #добавляем обработчик для консоли
+    # logger.addHandler(stream_handler)  #добавляем обработчик для консоли # It is just superfluous
 
     logger.info(f"Logging started. Logs are saved to: {log_path}")  #сообщение о запуске логирования
 
