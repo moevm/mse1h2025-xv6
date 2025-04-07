@@ -9,7 +9,7 @@ from subprocess import TimeoutExpired
 TARGET_DIR = "../lab_ready"     # Папка, где ищем Makefile
 COMMAND = ["make", "grade"]     # Команда для выполнения
 LOG_FILE = "logs/qemu-gdb.log"  # Файл логов
-START_LOGGING_STR = "make[1]: выход из каталога"  # Строка-триггер для логов
+START_LOGGING_STR = "make[1]: Leaving directory"  # Строка-триггер для логов
 
 def setup_logging(log_path):
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
