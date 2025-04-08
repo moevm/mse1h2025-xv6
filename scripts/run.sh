@@ -29,9 +29,7 @@ show_help() {
     echo "List of laboratory work names:"
     echo "  ${VALID_LABS[*]}"
     echo " "
-    echo "Valid archive format:"
-    echo " .zip, .tar, .gz, .tgz, .tar.gz, .7z, .rar"
-    echo " "
+    echo "Valid archive format: .zip"
     echo "The archive must contain the entire contents of the folder \"xv6-labs-2024/\" – the folder of the cloned (\"git clone git://g.csail.mit.edu/xv6-labs-2024\") for performing laboratory work of the repository, with the completed laboratory work (all necessary added files in the folder \"xv6-labs-2024/user/\")."
     echo "=================================================="
 }
