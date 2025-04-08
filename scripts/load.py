@@ -3,21 +3,10 @@ import os
 import sys
 import tempfile
 import zipfile
-import tarfile
 import shutil
 import subprocess
 import logging
 from pathlib import Path
-
-try:
-    import py7zr
-except ImportError:
-    py7zr = None
-
-try:
-    import rarfile
-except ImportError:
-    rarfile = None
 
 # путь к папке scripts
 script_dir = Path(__file__).resolve().parent
@@ -31,7 +20,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(log_file, mode='w'),  #перезаписывать каждый запуск
-        # logging.StreamHandler(sys.stdout) # It is just superfluous
     ]
 )
 logging.info(f"Logging to {log_file}")
@@ -41,42 +29,23 @@ def extract_archive(archive_path, extract_to):
 
     suffix = archive_path.suffix.lower()
 
+    if suffix != '.zip':
+        logging.error("Only .zip archives are supported!")
+        sys.exit(1)
+
     try:
-        if suffix == '.zip':
-            with zipfile.ZipFile(archive_path, 'r') as archive:
-                archive.extractall(extract_to)
-
-        elif suffix in ['.tar', '.gz', '.tgz', '.tar.gz']:
-            with tarfile.open(archive_path, 'r:*') as archive:
-                archive.extractall(extract_to)
-
-        elif suffix == '.7z':
-            if py7zr is None:
-                logging.error("py7zr is not installed! Install it with: pip install py7zr")
-                sys.exit(1)
-            with py7zr.SevenZipFile(archive_path, mode='r') as archive:
-                archive.extractall(path=extract_to)
-
-        elif suffix == '.rar':
-            if rarfile is None:
-                logging.error("rarfile is not installed! Install it with: pip install rarfile")
-                sys.exit(1)
-            try:
-                rf = rarfile.RarFile(archive_path)
-                rf.extractall(extract_to)
-            except rarfile.RarCannotExec as e:
-                logging.error(f"rarfile error: {e}. Make sure unrar or bsdtar is installed.")
-                sys.exit(1)
-
-        else:
-            logging.error("Unsupported archive format!")
-            sys.exit(1)
+        with zipfile.ZipFile(archive_path, 'r') as archive:
+            archive.extractall(extract_to)
 
         logging.info(f"Archive successfully extracted to {extract_to}")
 
+    except zipfile.BadZipFile as e:
+        logging.error(f"Bad zip file: {e}")
+        sys.exit(1)
     except Exception as e:
         logging.error(f"Error while extracting archive: {e}")
         sys.exit(1)
+
 
 def find_patch_file(directory):
     logging.info(f"Searching for patch file in {directory}")
@@ -85,6 +54,9 @@ def find_patch_file(directory):
         files = list(Path(directory).rglob(ext))
         if files:
             patch_file = files[0]
+            if patch_file.stat().st_size == 0:
+                logging.error(f"Patch file {patch_file} is empty!")
+                sys.exit(1)
             logging.info(f"Found patch file: {patch_file}")
             return patch_file
 
@@ -119,8 +91,8 @@ def apply_patch(patch_file, target_dir):
         return False
 
 def main():
-    parser = argparse.ArgumentParser(description='Prepare lab work from archive and apply patch.')
-    parser.add_argument('archive', help='Path to the lab archive (zip, rar, 7z, tar, tar.gz)')
+    parser = argparse.ArgumentParser(description='Prepare lab work from .zip archive and apply patch.')
+    parser.add_argument('archive', help='Path to the lab archive (.zip only)')
     args = parser.parse_args()
 
     archive_path = Path(args.archive)
@@ -150,12 +122,15 @@ def main():
 
         if output_dir.exists():
             shutil.rmtree(output_dir)
-        shutil.copytree(temp_dir, output_dir)
+        try:
+            shutil.copytree(temp_dir, output_dir)
+        except Exception as e:
+            logging.error(f"Error copying files to output directory: {e}")
+            sys.exit(1)
 
         logging.info(f"Lab work successfully prepared in: {output_dir}")
-        logging.info(f"Script directory: {script_dir}")
-        logging.info(f"Lab ready directory: {output_dir}")
 
 if __name__ == '__main__':
     main()
+
 
