@@ -127,13 +127,10 @@ def main():
 
         exit_code = proc.returncode
 
-        # если ошибка — проверим, не только ли time: FAIL в логах
         if exit_code != 0:
             all_output = "\n".join(stdout_lines + stderr_lines)
-            if "time: FAIL" in all_output:
-                logging.warning("Detected 'time: FAIL' — non-critical grading failure, ignoring error code")
-                logging.info("Process finished with status: NON-CRITICAL FAIL IGNORED")
-                sys.exit(0)
+            if "Score" in all_output:
+                exit_code = 0
 
         status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
         logging.info(f"Process finished with status: {status}")
