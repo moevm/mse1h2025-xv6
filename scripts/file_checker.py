@@ -46,18 +46,20 @@ def check_extension(file_path, valid_extensions):
     return True, ""
 
 def validate_files(lab_ready_path, valid_extensions, logger, max_size_mb=10):
-    errors = []  #список для хранения ошибок
+    errors = []
+    user_dirs_checked = 0
+    files_checked = 0
 
-    #рекурсивный обход папки lab_ready и поиск папок 'user'
     for dirpath, dirnames, filenames in os.walk(lab_ready_path):
-        if os.path.basename(dirpath) == 'user':  #обрабатываем только папки 'user'
+        if os.path.basename(dirpath) == 'user':
+            user_dirs_checked += 1
             logger.info(f"\nChecking folder: {dirpath}")
 
-            for filename in filenames:  #обрабатываем файлы внутри папки
+            for filename in filenames:
+                files_checked += 1
                 file_path = os.path.join(dirpath, filename)
                 logger.info(f"Checking file: {file_path}")
 
-                #проверка кодировки, размера и расширения файла
                 is_valid_encoding, encoding_error = check_encoding(file_path)
                 if not is_valid_encoding:
                     logger.error(encoding_error)
@@ -73,7 +75,7 @@ def validate_files(lab_ready_path, valid_extensions, logger, max_size_mb=10):
                     logger.error(extension_error)
                     errors.append(extension_error)
 
-    return errors
+    return errors, user_dirs_checked, files_checked
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.dirname(__file__))  #определение базовой директории проекта
@@ -93,14 +95,17 @@ if __name__ == "__main__":
 
     valid_extensions = ['.c', '.h', '.txt', '.py', '.S', '.ld', '.pl', '.sh']  #разрешённые расширения файлов
 
-    errors = validate_files(lab_ready_path, valid_extensions, logger)  #проверка файлов
+    errors, user_dirs_checked, files_checked = validate_files(lab_ready_path, valid_extensions, logger)
+
+    # логируем summary
+    logger.info(f"Summary: checked {user_dirs_checked} 'user' folders, {files_checked} files, found {len(errors)} error(s).")
 
     if errors:
-        logger.warning("\nErrors found during file check:\n")  #если ошибки найдены, выводим предупреждения
+        logger.warning("\nErrors found during file check:\n")
         for error in errors:
             logger.warning(error)
         logger.info("File check completed with errors.")
         sys.exit(1)
     else:
-        logger.info("All files meet the requirements!")  #если ошибок нет
+        logger.info("All files meet the requirements!")
 

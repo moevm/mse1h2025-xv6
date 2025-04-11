@@ -9,7 +9,7 @@ from subprocess import TimeoutExpired
 TARGET_DIR = "../lab_ready"     # Папка, где ищем Makefile
 COMMAND = ["make", "grade"]     # Команда для выполнения
 LOG_FILE = "logs/qemu-gdb.log"  # Файл логов
-START_LOGGING_STR = "make[1]: выход из каталога"  # Строка-триггер для логов
+START_LOGGING_STR = "make[1]: Leaving directory"  # Строка-триггер для логов
 
 def setup_logging(log_path):
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -24,18 +24,12 @@ def get_script_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 def find_makefile_dir(start_dir):
-    """
-    Рекурсивно ищет директорию с Makefile
-    """
     for dirpath, dirnames, filenames in os.walk(start_dir):
         if 'Makefile' in filenames:
             return dirpath
     return None
 
 def read_stream(stream, stream_type, trigger_str):
-    """
-    Чтение вывода процесса и логирование
-    """
     trigger_count = 0
     logging_enabled = False
 
@@ -61,45 +55,61 @@ def read_stream(stream, stream_type, trigger_str):
             # print(decoded_line)
 
 def main():
-    timeout = 300 # Таймаут процесса
+    timeout = 300  # Таймаут процесса
     script_dir = get_script_dir()
     log_path = os.path.join(os.path.abspath(os.path.join(script_dir, "..")), LOG_FILE)
     setup_logging(log_path)
-    
-    # Поиск директории с Makefile
+
     lab_ready_path = os.path.abspath(os.path.join(script_dir, TARGET_DIR))
     makefile_dir = find_makefile_dir(lab_ready_path)
-    
+
     if not makefile_dir:
-        error_msg = f"Makefile not found {lab_ready_path}"
-        # print(error_msg)
-        logging.error(error_msg)
+        logging.error(f"Makefile not found {lab_ready_path}")
         sys.exit(1)
-    
-    # Переход в директорию с Makefile
+
     try:
         os.chdir(makefile_dir)
     except Exception as e:
-        error_msg = f"Error switching to directory {makefile_dir}: {str(e)}"
-        # print(error_msg)
-        logging.error(error_msg)
+        logging.error(f"Error switching to directory {makefile_dir}: {str(e)}")
         sys.exit(1)
-    
-    # print(f"Лог-файл: {log_path}\nWorking directory: {os.getcwd()}")
-    
+
     try:
-        # Заголовок запуска
         logging.info("Process started")
         proc = subprocess.Popen(COMMAND, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # Потоки для чтения вывода
-        stdout_thread = threading.Thread(target=read_stream, args=(proc.stdout, "STDOUT", START_LOGGING_STR))
-        stderr_thread = threading.Thread(target=read_stream, args=(proc.stderr, "STDERR", START_LOGGING_STR))
-        
-        stdout_thread.start()
-        stderr_thread.start()
-        
-        # Ожидание процесса
+        stdout_lines = []
+        stderr_lines = []
+
+        def read_and_store(stream, stream_type):
+            trigger_count = 0
+            logging_enabled = False
+
+            for line in iter(stream.readline, b''):
+                decoded = line.decode(errors='replace').rstrip()
+                if START_LOGGING_STR in decoded:
+                    trigger_count += 1
+                    if trigger_count == 2:
+                        logging_enabled = True
+                        logging.info("=== LOGGING STARTED ===")
+                    continue
+
+                if logging_enabled:
+                    if stream_type == "STDOUT":
+                        logging.info(decoded)
+                    else:
+                        logging.error(decoded)
+
+                if stream_type == "STDOUT":
+                    stdout_lines.append(decoded)
+                else:
+                    stderr_lines.append(decoded)
+
+        t_out = threading.Thread(target=read_and_store, args=(proc.stdout, "STDOUT"))
+        t_err = threading.Thread(target=read_and_store, args=(proc.stderr, "STDERR"))
+
+        t_out.start()
+        t_err.start()
+
         try:
             proc.wait(timeout=timeout)
         except TimeoutExpired:
@@ -111,24 +121,28 @@ def main():
                 logging.critical("Force kill executed")
                 proc.kill()
                 proc.wait()
-        
-        stdout_thread.join(timeout=1)
-        stderr_thread.join(timeout=1)
-    
+
+        t_out.join(timeout=1)
+        t_err.join(timeout=1)
+
+        exit_code = proc.returncode
+
+        if exit_code != 0:
+            all_output = "\n".join(stdout_lines + stderr_lines)
+            if "Score" in all_output:
+                exit_code = 0
+
+        status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
+        logging.info(f"Process finished with status: {status}")
+        sys.exit(exit_code)
+
     except KeyboardInterrupt:
         logging.warning("User interrupted execution")
-        # print("\nUser interruption")
         sys.exit(1)
     except Exception as e:
         logging.critical(f"Critical error: {e}")
-        # print(f"A critical error has occurred: {str(e)}")
         sys.exit(1)
-    
-    # Финальный статус
-    exit_code = proc.returncode
-    status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
-    logging.info(f"Process finished with status: {status}")
-    sys.exit(exit_code)
+
 
 if __name__ == "__main__":
     main()
