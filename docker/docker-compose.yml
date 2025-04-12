@@ -6,12 +6,20 @@ services:
     ports:
       - "${PORT:-5000}:5000"  # Указываем порт через переменную окружения, по умолчанию 5000
     environment:
-      - HOST=${HOST:-"0.0.0.0"} # Добавлено значение по умолчанию для HOST
+      - HOST=${HOST:-127.0.0.1} # Добавлено значение по умолчанию для HOST
       - PYTHONPATH=/app # Для импорта модулей
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     volumes:
-      - ../solution:/app/solution
-      - ../tests:/app/tests
+      - ../solution:/app/solution:ro
+      - ../tests:/app/tests:ro
       - ../logs:/app/logs
+    user: appuser
+    security_opt:
+      - no-new-privileges:true
     command: ${ARGS} # Команда для запуска
     restart: always
 
