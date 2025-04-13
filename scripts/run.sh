@@ -1,11 +1,12 @@
 #!/bin/bash
 
 VALID_LABS=("util" "syscall" "pgtbl" "traps" "cow" "net" "lock" "fs" "mmap")
+
 BASE_DIR=$(realpath "$(dirname "$0")/..") 
-LOGS_DIR="$BASE_DIR/logs"
-SOLUTION_DIR="$BASE_DIR/solution"
-RESULTS_DIR="$LOGS_DIR"
 SCRIPTS_DIR="$BASE_DIR/scripts" 
+SOLUTION_DIR="$BASE_DIR/solution"
+LOGS_DIR="$BASE_DIR/logs"
+RESULTS_DIR="$LOGS_DIR"
 
 if [[ $# -lt 1 ]]; then
     echo "Error: Parameters are not specified. Use --help for reference."
@@ -13,25 +14,26 @@ if [[ $# -lt 1 ]]; then
 fi
 
 show_help() {
-    echo "=================================================="
-    echo "                 Automated system"
-    echo "            verification of Lab 6.828"
-    echo "=================================================="
+    echo "=============================================================="
+    echo "                       Automated system"
+    echo "                  verification of Lab 6.828"
+    echo "=============================================================="
     echo "USE: ./run.sh [KEYS]... [TARGET]..."
     echo "KEYS (flags):"
-    echo "  --help             The output of this instruction"
-    echo "  --validate [1] [2] Download and verify the solution"
-    echo "  --report [1] [2]   Show the verification results"
+    echo "  --help                     The output of this instruction"
+    echo "  --validate [lab] [archive] Download and verify the solution"
+    echo "  --report [lab] [archive]   Show the verification results"
     echo "PURPOSE:"
-    echo "  [1] _the_name_of_the_lab_"
-    echo "  [2] _the_name_of_the_uploaded_archive_"
+    echo "  [lab] – the name of the lab"
+    echo "  [archive] – the full name of the uploaded archive"
+    echo "              (the path to it and it's name)"
     echo " "
     echo "List of laboratory work names:"
     echo "  ${VALID_LABS[*]}"
     echo " "
     echo "Valid archive format: .zip"
-    echo "The archive must contain the entire contents of the folder \"xv6-labs-2024/\" – the folder of the cloned (\"git clone git://g.csail.mit.edu/xv6-labs-2024\") for performing laboratory work of the repository, with the completed laboratory work (all necessary added files in the folder \"xv6-labs-2024/user/\")."
-    echo "=================================================="
+    echo "The archive should contain a single patch file obtained after making changes to the previously cloned repository xv6-labs-2024 ("git clone git://g.csail.mit.edu/xv6-labs-2024")."
+    echo "=============================================================="
 }
 
 is_valid_lab() {
@@ -68,7 +70,7 @@ load_and_test_solution() {
     local archive=$2
     local archive_name=$(basename "$archive")
     local log_file="$LOGS_DIR/$archive_name.log"
-    local report_file="$LOGS_DIR/$archive_name.json"
+    local report_file="$RESULTS_DIR/$archive_name.json"
 
     # Создание дирректории с log-файлами и очистка старых логов в случае, если они уже существовали
     mkdir -p "$LOGS_DIR"
@@ -115,16 +117,16 @@ show_report() {
     local lab=$1
     local archive=$2
     local archive_name=$(basename "$archive")
-    local report_file="$LOGS_DIR/$archive_name.log"
+    local log_file="$LOGS_DIR/$archive_name.log"
 
-    if [[ ! -f "$report_file" ]]; then
-        echo "Error: The report file $report_file not found."
+    if [[ ! -f "$log_file" ]]; then
+        echo "Error: The report file $log_file not found."
         exit 1
     fi
 
-    echo "Found the file \"$report_file\"."
+    echo "Found the file \"$log_file\"."
     echo "Checking the archive format:"
-    cat "$report_file"
+    cat "$log_file"
 }
 
 case "$1" in
