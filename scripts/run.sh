@@ -76,7 +76,7 @@ load_and_test_solution() {
 
     # load.py
     echo "Uploading the solution..."
-    python3 "$SCRIPTS_DIR/load.py" "$archive"
+    python3 "$SCRIPTS_DIR/load.py" "$lab" "$archive"
     if [[ $? -ne 0 ]]; then
         echo "Error loading the solution. Details in the log: $log_file" | tee -a "$LOGS_DIR/error.log"
         python3 "$SCRIPTS_DIR/generate_report.py" "$archive_name"
