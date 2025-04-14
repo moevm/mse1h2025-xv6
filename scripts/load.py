@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import sys
 import tempfile
 import zipfile
@@ -10,127 +11,253 @@ from pathlib import Path
 
 # путь к папке scripts
 script_dir = Path(__file__).resolve().parent
-
 logs_dir = script_dir.parent / 'logs'
-logs_dir.mkdir(parents=True, exist_ok=True)  #создаём папку logs, если нет
+logs_dir.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
 
 log_file = logs_dir / 'load.log'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_file, mode='w'),  #перезаписывать каждый запуск
+        logging.FileHandler(log_file, mode='w'),  # перезаписывать каждый запуск
     ]
 )
 logging.info(f"Logging to {log_file}")
 
-def extract_archive(archive_path, extract_to):
-    logging.info(f"Extracting archive: {archive_path}")
+XV6_REPO_URL = "git://g.csail.mit.edu/xv6-labs-2024"
+XV6_REPO_DIR = script_dir.parent / 'lab_ready' / 'xv6-labs-2024'
 
-    suffix = archive_path.suffix.lower()
+PATCH_DEST_DIR = script_dir.parent / 'lab_ready'
+PATCH_DEST_DIR.mkdir(parents=True, exist_ok=True)
 
-    if suffix != '.zip':
-        logging.error("Only .zip archives are supported!")
-        sys.exit(1)
+LAB_BRANCH_MAPPING = {
+    'util': 'util',
+    'syscall': 'syscall',
+    'pgtbl': 'pgtbl',
+    'traps': 'traps',
+    'cow': 'cow',
+    'thread': 'thread',
+    'net': 'net',
+    'lock': 'lock',
+    'fs': 'fs',
+    'mmap': 'mmap',
+}
 
-    try:
-        with zipfile.ZipFile(archive_path, 'r') as archive:
-            archive.extractall(extract_to)
-
-        logging.info(f"Archive successfully extracted to {extract_to}")
-
-    except zipfile.BadZipFile as e:
-        logging.error(f"Bad zip file: {e}")
-        sys.exit(1)
-    except Exception as e:
-        logging.error(f"Error while extracting archive: {e}")
-        sys.exit(1)
-
-
-def find_patch_file(directory):
-    logging.info(f"Searching for patch file in {directory}")
-
-    for ext in ('*.patch', '*.diff'):
-        files = list(Path(directory).rglob(ext))
-        if files:
-            patch_file = files[0]
-            if patch_file.stat().st_size == 0:
-                logging.error(f"Patch file {patch_file} is empty!")
-                sys.exit(1)
-            logging.info(f"Found patch file: {patch_file}")
-            return patch_file
-
-    logging.warning("No patch file found!")
+def detect_lab_branch(archive_name):
+    """Определяет ветку лабы на основе имени архива"""
+    archive_name = archive_name.lower()
+    
+    for lab_pattern, branch in LAB_BRANCH_MAPPING.items():
+        if lab_pattern in archive_name:
+            return branch
+    
+    match = re.search(r'lab-?(\w+)', archive_name)
+    if match:
+        lab_name = match.group(1)
+        if lab_name in LAB_BRANCH_MAPPING:
+            return LAB_BRANCH_MAPPING[lab_name]
+    
+    logging.warning(f"Cannot detect lab branch from archive name: {archive_name}")
     return None
 
-def apply_patch(patch_file, target_dir):
-    logging.info(f"Applying patch {patch_file} to {target_dir}")
-
+def clone_xv6_repo():
+    """Клонирует репозиторий xv6, если он ещё не существует"""
+    if XV6_REPO_DIR.exists():
+        logging.info("xv6 repository already exists")
+        return True
+    
+    logging.info(f"Cloning xv6 repository from {XV6_REPO_URL}")
     try:
-        cmd = ['patch', '-p1', '-i', str(patch_file)]
-        result = subprocess.run(cmd, cwd=target_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(
+            ['git', 'clone', XV6_REPO_URL, str(XV6_REPO_DIR)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        logging.info("Successfully cloned xv6 repository")
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to clone xv6 repository: {e.stderr}")
+        return False
 
+def checkout_lab_branch(branch_name):
+    """Переключается на ветку лабы"""
+    logging.info(f"Checking out lab branch: {branch_name}")
+    try:
+        result = subprocess.run(
+            ['git', 'show-ref', '--verify', f'refs/heads/{branch_name}'],
+            cwd=XV6_REPO_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            logging.error(f"Branch {branch_name} doesn't exist in the repository")
+            return False
+        
+        subprocess.run(
+            ['git', 'checkout', branch_name],
+            cwd=XV6_REPO_DIR,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        result = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=XV6_REPO_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        commit_hash = result.stdout.strip()
+        logging.info(f"Checked out branch {branch_name}, commit: {commit_hash}")
+        return True
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to checkout branch {branch_name}: {e.stderr}")
+        return False
+
+def extract_patch_from_archive(archive_path):
+    """Извлекает patch файл из архива в lab_ready"""
+    logging.info(f"Extracting patch from archive: {archive_path}")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as archive:
+                archive.extractall(temp_dir)
+            
+            for ext in ('*.patch', '*.diff'):
+                files = list(Path(temp_dir).rglob(ext))
+                if files:
+                    patch_file = files[0]
+                    if patch_file.stat().st_size == 0:
+                        logging.error("Found empty patch file!")
+                        return None
+                    
+                    dest_patch = PATCH_DEST_DIR / patch_file.name
+                    shutil.copy(patch_file, dest_patch)
+                    logging.info(f"Copied patch to: {dest_patch}")
+                    return dest_patch
+
+            logging.error("No patch file found in archive!")
+            return None
+
+        except zipfile.BadZipFile:
+            logging.error("Invalid zip archive!")
+            return None
+        except Exception as e:
+            logging.error(f"Error extracting archive: {e}")
+            return None
+
+def apply_patch(patch_file):
+    """Применяет патч к репозиторию xv6"""
+    logging.info(f"Applying patch {patch_file} to xv6 repository")
+    
+    try:
+        check_cmd = ['git', 'apply', '--check', str(patch_file)]
+        result = subprocess.run(
+            check_cmd,
+            cwd=XV6_REPO_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            logging.error(f"Patch check failed: {result.stderr.strip()}")
+            return False
+        
+        apply_cmd = ['git', 'apply', str(patch_file)]
+        result = subprocess.run(
+            apply_cmd,
+            cwd=XV6_REPO_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
         if result.returncode == 0:
-            logging.info("Patch applied successfully using patch.")
+            logging.info("Patch applied successfully")
+            return True
+        
+        logging.error(f"Failed to apply patch: {result.stderr.strip()}")
+        return False
+
+    except Exception as e:
+        logging.error(f"Error applying patch: {e}")
+        return False
+
+def check_makefile_changed(patch_file):
+    """Проверяет, изменяется ли Makefile в патче"""
+    logging.info(f"Checking if Makefile is modified in patch: {patch_file}")
+    try:
+        result = subprocess.run(
+            ['git', 'apply', '--stat', str(patch_file)],
+            cwd=XV6_REPO_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        if result.returncode != 0:
+            logging.error(f"Failed to analyze patch: {result.stderr.strip()}")
+            return False
+
+        changed_files = result.stdout
+        logging.info("Patch affects the following files:\n" + changed_files)
+
+        if 'Makefile' in changed_files:
+            logging.info("Makefile is modified by the patch.")
             return True
         else:
-            logging.warning(f"patch command failed: {result.stderr.strip()}")
-
-        cmd = ['git', 'apply', str(patch_file)]
-        result = subprocess.run(cmd, cwd=target_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        if result.returncode == 0:
-            logging.info("Patch applied successfully using git apply.")
-            return True
-        else:
-            logging.error(f"git apply failed: {result.stderr.strip()}")
+            logging.error("Add your sleep program to UPROGS in Makefile; once you've done that, make qemu will compile your program and you'll be able to run it from the xv6 shell.")
             return False
 
     except Exception as e:
-        logging.error(f"Error while applying patch: {e}")
+        logging.error(f"Error checking Makefile modification: {e}")
         return False
 
 def main():
-    parser = argparse.ArgumentParser(description='Prepare lab work from .zip archive and apply patch.')
-    parser.add_argument('archive', help='Path to the lab archive (.zip only)')
+    parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+    parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+    parser.add_argument('archive', help='Path to the zip archive containing patch file')
     args = parser.parse_args()
 
+    lab_branch = args.lab_branch
     archive_path = Path(args.archive)
 
     if not archive_path.is_file():
-        logging.error(f"File not found: {archive_path}")
+        logging.error(f"Archive not found: {archive_path}")
         sys.exit(1)
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        logging.info(f"Temporary directory created: {temp_dir}")
+    logging.info(f"Using provided lab branch: {lab_branch}")
 
-        extract_archive(archive_path, temp_dir)
+    patch_file = extract_patch_from_archive(archive_path)
+    if not patch_file:
+        logging.error("Failed to extract patch file from archive")
+        sys.exit(1)
 
-        patch_file = find_patch_file(temp_dir)
+    if not clone_xv6_repo():
+        sys.exit(1)
 
-        if patch_file:
-            success = apply_patch(patch_file, temp_dir)
-            if not success:
-                logging.error("Patch application failed. Exiting.")
-                sys.exit(1)
-        else:
-            logging.warning("No patch found. Skipping patch application.")
+    if not checkout_lab_branch(lab_branch):
+        sys.exit(1)
 
-        #папка lab_ready создаётся на одном уровне с scripts
-        output_dir = script_dir.parent / 'lab_ready'
-        logging.info(f"Output directory set to: {output_dir}")
+    if not apply_patch(patch_file):
+        logging.error("Failed to apply patch. Exiting.")
+        sys.exit(1)
 
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-        try:
-            shutil.copytree(temp_dir, output_dir)
-        except Exception as e:
-            logging.error(f"Error copying files to output directory: {e}")
-            sys.exit(1)
+    if not check_makefile_changed(patch_file):
+        logging.error("Patch does not change the Makefile. Exiting.")
+        sys.exit(1)
 
-        logging.info(f"Lab work successfully prepared in: {output_dir}")
+    logging.info(f"Successfully applied patch to xv6 repository at {XV6_REPO_DIR}")
+    logging.info(f"Lab branch: {lab_branch}")
+    logging.info("You can now run the lab tests in the xv6 repository")
 
 if __name__ == '__main__':
     main()
-
-
