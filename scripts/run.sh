@@ -72,6 +72,12 @@ load_and_test_solution() {
     local log_file="$LOGS_DIR/$archive_name.log"
     local report_file="$RESULTS_DIR/$archive_name.json"
 
+    # Удаление существующей папки lab_ready, если она есть
+    if [[ -d "$BASE_DIR/lab_ready" ]]; then
+        echo "Removing existing lab_ready directory..."
+        rm -rf "$BASE_DIR/lab_ready"
+    fi
+
     # Создание дирректории с log-файлами и очистка старых логов в случае, если они уже существовали
     mkdir -p "$LOGS_DIR"
     rm -f "$LOGS_DIR/load.log" "$LOGS_DIR/file_checker.log" "$LOGS_DIR/qemu-gdb.log" "$LOGS_DIR/error.log"
