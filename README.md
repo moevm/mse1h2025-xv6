@@ -147,3 +147,8 @@ make -C docker/ prune
 ```bash
 docker container prune -f
 ```
+
+## Получаемый результат
+
+- После запуска контейнера с флагом `--validate` система сгенерирует log_file=`"$LOGS_DIR/$archive_name.log"` и report_file=`"$RESULTS_DIR/$archive_name.json"`. log_file находится LOGS_DIR=`"$BASE_DIR/logs"`, report_file находится в RESULTS_DIR=`"$LOGS_DIR"` (из соображений избыточности они совпадают).
+- После запуска контейнера с флагом `--report` log_file выводится на экран.
