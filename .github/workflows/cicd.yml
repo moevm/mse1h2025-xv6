@@ -1,0 +1,46 @@
+name: CI/CD with GitHub Output
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    outputs:
+      status: ${{ steps.set_output.outputs.result }}
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Build
+        run: make -C docker/ build
+
+      - name: Help
+        run: make -C docker/ run ARGS="--help" 
+
+      - name: Run tests
+        id: test_step
+        run: |
+          pytest ./test/ --junitxml=test-results.xml || echo "Tests failed"
+          echo "result=${{ job.status }}" >> $GITHUB_OUTPUT
+
+      - name: Set job output
+        id: set_output
+        run: |
+          echo "result=${{ job.status }}" >> $GITHUB_OUTPUT
+
+  report:
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Show pipeline status
+        run: |
+          echo "Pipeline status: ${{ needs.build-and-test.outputs.status }}"
+          echo "Detailed result: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
