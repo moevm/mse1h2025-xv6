@@ -1,14 +1,29 @@
+import argparse
 import os
 import sys
 import logging
+from pathlib import Path
 from datetime import datetime
 
-def setup_logger(logs_dir):
-    os.makedirs(logs_dir, exist_ok=True)  #создание папки для логов, если её нет
+'''parser'''
+parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+parser.add_argument('archive', help='Path to the zip archive containing patch file')
+args = parser.parse_args()
 
-    log_filename = "file_checker.log"  #название файла лога
-    log_path = os.path.join(logs_dir, log_filename)  #путь к файлу лога
+lab_branch = args.lab_branch
+archive_path = Path(args.archive)
+archive_name = os.path.basename(archive_path)
 
+'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
+
+LOG_FILE = LOGS_DIR / f"{archive_name}.log"
+
+def setup_logger(log_path):
     logger = logging.getLogger('FileChecker')  #создание логгера
     logger.setLevel(logging.INFO)  #уровень логирования - INFO
 
@@ -21,7 +36,7 @@ def setup_logger(logs_dir):
     logger.addHandler(file_handler)  #добавляем обработчик в логгер
     # logger.addHandler(stream_handler)  #добавляем обработчик для консоли # It is just superfluous
 
-    logger.info(f"Logging started. Logs are saved to: {log_path}")  #сообщение о запуске логирования
+    logger.info(f"\n\nTrivial checks:\nLogging started. Logs are saved to: {log_path}")  #сообщение о запуске логирования
 
     return logger
 
@@ -77,19 +92,15 @@ def validate_files(lab_ready_path, valid_extensions, logger, max_size_mb=10):
 
     return errors, user_dirs_checked, files_checked
 
-if __name__ == "__main__":
-    base_dir = os.path.dirname(os.path.dirname(__file__))  #определение базовой директории проекта
+def main():
+    lab_ready_path = os.path.join(BASE_DIR, 'lab_ready')   # lab_ready
 
-    #папки lab_ready и logs находятся на одном уровне с скриптом
-    lab_ready_path = os.path.join(base_dir, 'lab_ready')
-    logs_dir = os.path.join(base_dir, 'logs')
-
-    #проверка существования папки lab_ready
+    # проверка существования папки lab_ready
     if not os.path.exists(lab_ready_path):
         print(f"Folder lab_ready not found at path: {lab_ready_path}")
         sys.exit(1)
 
-    logger = setup_logger(logs_dir)  #настройка логгера
+    logger = setup_logger(LOG_FILE)  # настройка логгера
 
     logger.info(f"Starting file check in 'user' folders within: {lab_ready_path}")
 
@@ -109,3 +120,5 @@ if __name__ == "__main__":
     else:
         logger.info("All files meet the requirements!")
 
+if __name__ == '__main__':
+    main()
