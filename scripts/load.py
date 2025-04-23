@@ -49,11 +49,11 @@ LAB_BRANCH_MAPPING = {
 
 def setup_logging():
     logging.basicConfig(
-       level=logging.INFO,
-       format='%(asctime)s - %(levelname)s - %(message)s',
-       handlers=[
-           logging.FileHandler(LOG_FILE, mode='w'),  # перезаписывать каждый запуск
-       ]
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(LOG_FILE, mode='w'),  # перезаписывать каждый запуск
+        ]
     )
     logging.info(f"Logging to {LOG_FILE}")
 
