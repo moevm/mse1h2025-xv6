@@ -42,9 +42,6 @@ def setup_logging(log_path):
     )
     logging.info("\n\nChecking the performance of laboratory work:")
 
-def get_script_dir():
-    return os.path.dirname(os.path.abspath(__file__))
-
 def find_makefile_dir(start_dir):
     for dirpath, dirnames, filenames in os.walk(start_dir):
         if 'Makefile' in filenames:
@@ -78,11 +75,9 @@ def read_stream(stream, stream_type, trigger_str):
 
 def main():
     timeout = 300  # Таймаут процесса
-    script_dir = get_script_dir()
-    log_path = os.path.join(os.path.abspath(os.path.join(script_dir, "..")), LOG_FILE)
-    setup_logging(log_path)
+    setup_logging(LOG_FILE)
 
-    lab_ready_path = os.path.abspath(os.path.join(script_dir, TARGET_DIR))
+    lab_ready_path = os.path.abspath(os.path.join(SCRIPT_DIR, TARGET_DIR))
     makefile_dir = find_makefile_dir(lab_ready_path)
 
     if not makefile_dir:
