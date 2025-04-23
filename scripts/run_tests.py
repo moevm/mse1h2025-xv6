@@ -1,24 +1,46 @@
+import argparse
 import os
 import subprocess
 import sys
 import threading
 import logging
+from pathlib import Path
 from datetime import datetime
 from subprocess import TimeoutExpired
 
+'''parser'''
+parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+parser.add_argument('archive', help='Path to the zip archive containing patch file')
+args = parser.parse_args()
+
+lab_branch = args.lab_branch
+archive_path = Path(args.archive)
+archive_name = os.path.basename(archive_path)
+
+'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
+
+LOG_FILE = LOGS_DIR / f"{archive_name}.log"
+
+'''TARGET'''
 TARGET_DIR = "../lab_ready"     # Папка, где ищем Makefile
 COMMAND = ["make", "grade"]     # Команда для выполнения
-LOG_FILE = "logs/qemu-gdb.log"  # Файл логов
-START_LOGGING_STR = "make[1]: Leaving directory"  # Строка-триггер для логов
+# Строки-триггеры для логов
+START_LOGGING_STR_EN = "make[1]: Leaving directory"
+START_LOGGING_STR_RU = "make[1]: выход из каталога"
 
 def setup_logging(log_path):
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     logging.basicConfig(
         filename=log_path,
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    logging.info("\n\nChecking the performance of laboratory work:")
 
 def get_script_dir():
     return os.path.dirname(os.path.abspath(__file__))
@@ -86,7 +108,7 @@ def main():
 
             for line in iter(stream.readline, b''):
                 decoded = line.decode(errors='replace').rstrip()
-                if START_LOGGING_STR in decoded:
+                if (START_LOGGING_STR_EN in decoded) or (START_LOGGING_STR_RU in decoded):
                     trigger_count += 1
                     if trigger_count == 2:
                         logging_enabled = True
