@@ -96,6 +96,7 @@ def main():
 
         stdout_lines = []
         stderr_lines = []
+        score_str = ""
 
         def read_and_store(stream, stream_type):
             trigger_count = 0
@@ -103,6 +104,7 @@ def main():
 
             for line in iter(stream.readline, b''):
                 decoded = line.decode(errors='replace').rstrip()
+                
                 if (START_LOGGING_STR_EN in decoded) or (START_LOGGING_STR_RU in decoded):
                     trigger_count += 1
                     if trigger_count == 2:
@@ -115,6 +117,13 @@ def main():
                         logging.info(decoded)
                     else:
                         logging.error(decoded)
+                    if "Score:" in decoded:
+                        global score_str
+                        score_str = decoded.split("Score:")[1].strip()
+                        numerator, denominator = map(int, score_str.split('/'))
+                        rounded_value = round(numerator / denominator, 2)
+                        score_str = f"Score: {rounded_value:.2f}"
+                        logging.info(score_str)
 
                 if stream_type == "STDOUT":
                     stdout_lines.append(decoded)
@@ -141,7 +150,7 @@ def main():
 
         t_out.join(timeout=1)
         t_err.join(timeout=1)
-
+        
         exit_code = proc.returncode
 
         if exit_code != 0:
@@ -151,6 +160,7 @@ def main():
 
         status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
         logging.info(f"Process finished with status: {status}")
+        print(score_str)
         sys.exit(exit_code)
 
     except KeyboardInterrupt:
