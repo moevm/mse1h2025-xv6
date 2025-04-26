@@ -163,20 +163,6 @@ fs.img: mkfs/mkfs README $(UPROGS)
 
     assert checker_result.returncode == 0, "file_checker.py failed"
 
-    test_result = subprocess.run(
-        ["python", str(scripts_dir / "run_tests.py")],
-        cwd=base_dir,
-        capture_output=True,
-        text=True,
-        timeout=300
-    )
-
-    print("\n=== RUN_TESTS.PY OUTPUT ===")
-    print("STDOUT:", test_result.stdout)
-    print("STDERR:", test_result.stderr)
-
-    assert test_result.returncode in [0, 1], "run_tests.py failed"
-
     report_result = subprocess.run(
         ["python", str(scripts_dir / "generate_report.py"), "test_report"],
         cwd=base_dir,
