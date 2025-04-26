@@ -19,7 +19,9 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y make gcc qemu-system-x86 
+        sudo apt-get install -y make gcc
+        sudo apt-get install -y qemu-system-x86 qemu-system-gui qemu-utils  # Ключевое изменение
+        
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
@@ -35,18 +37,13 @@ jobs:
       run: |
         make --version
         gcc --version
-        qemu-system-x86 --version
+        qemu-system-x86_64 --version  # Изменено с qemu-system-x86
         
     - name: Debug info
       run: |
-        ls -lR lab_ready
-        which qemu-system-x86
-        qemu-system-x86 --version
-
-    - name: Find QEMU
-      run: |
-        which qemu-system-x86 || echo "QEMU not found!"
-    
+        ls -lR lab_ready || echo "lab_ready not found"
+        which qemu-system-x86_64 || echo "QEMU not found!"
+        
     - name: Run tests
       run: |
         pytest tests/functional/ tests/integration/ -v --cov=scripts --cov-report=xml
