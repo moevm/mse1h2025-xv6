@@ -1,27 +1,46 @@
+import argparse
 import os
 import subprocess
 import sys
 import threading
 import logging
+from pathlib import Path
 from datetime import datetime
 from subprocess import TimeoutExpired
 
+'''parser'''
+parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+parser.add_argument('archive', help='Path to the zip archive containing patch file')
+args = parser.parse_args()
+
+lab_branch = args.lab_branch
+archive_path = Path(args.archive)
+archive_name = os.path.basename(archive_path)
+
+'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
+
+LOG_FILE = LOGS_DIR / f"{archive_name}.log"
+
+'''TARGET'''
 TARGET_DIR = "../lab_ready"     # Папка, где ищем Makefile
 COMMAND = ["make", "grade"]     # Команда для выполнения
-LOG_FILE = "logs/qemu-gdb.log"  # Файл логов
-START_LOGGING_STR = "make[1]: Leaving directory"  # Строка-триггер для логов
+# Строки-триггеры для логов
+START_LOGGING_STR_EN = "make[1]: Leaving directory"
+START_LOGGING_STR_RU = "make[1]: выход из каталога"
 
 def setup_logging(log_path):
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     logging.basicConfig(
         filename=log_path,
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-def get_script_dir():
-    return os.path.dirname(os.path.abspath(__file__))
+    logging.info("\n\nChecking the performance of laboratory work:")
 
 def find_makefile_dir(start_dir):
     for dirpath, dirnames, filenames in os.walk(start_dir):
@@ -56,11 +75,9 @@ def read_stream(stream, stream_type, trigger_str):
 
 def main():
     timeout = 300  # Таймаут процесса
-    script_dir = get_script_dir()
-    log_path = os.path.join(os.path.abspath(os.path.join(script_dir, "..")), LOG_FILE)
-    setup_logging(log_path)
+    setup_logging(LOG_FILE)
 
-    lab_ready_path = os.path.abspath(os.path.join(script_dir, TARGET_DIR))
+    lab_ready_path = os.path.abspath(os.path.join(SCRIPT_DIR, TARGET_DIR))
     makefile_dir = find_makefile_dir(lab_ready_path)
 
     if not makefile_dir:
@@ -79,6 +96,7 @@ def main():
 
         stdout_lines = []
         stderr_lines = []
+        score_str = ""
 
         def read_and_store(stream, stream_type):
             trigger_count = 0
@@ -86,7 +104,8 @@ def main():
 
             for line in iter(stream.readline, b''):
                 decoded = line.decode(errors='replace').rstrip()
-                if START_LOGGING_STR in decoded:
+                
+                if (START_LOGGING_STR_EN in decoded) or (START_LOGGING_STR_RU in decoded):
                     trigger_count += 1
                     if trigger_count == 2:
                         logging_enabled = True
@@ -98,6 +117,13 @@ def main():
                         logging.info(decoded)
                     else:
                         logging.error(decoded)
+                    if "Score:" in decoded:
+                        global score_str
+                        score_str = decoded.split("Score:")[1].strip()
+                        numerator, denominator = map(int, score_str.split('/'))
+                        rounded_value = round(numerator / denominator, 2)
+                        score_str = f"Score: {rounded_value:.2f}"
+                        logging.info(score_str)
 
                 if stream_type == "STDOUT":
                     stdout_lines.append(decoded)
@@ -124,7 +150,7 @@ def main():
 
         t_out.join(timeout=1)
         t_err.join(timeout=1)
-
+        
         exit_code = proc.returncode
 
         if exit_code != 0:
@@ -134,6 +160,7 @@ def main():
 
         status = "TRUE" if exit_code == 0 else f"FALSE ({exit_code})"
         logging.info(f"Process finished with status: {status}")
+        print(score_str)
         sys.exit(exit_code)
 
     except KeyboardInterrupt:
