@@ -1,58 +1,28 @@
-from pathlib import Path
+import argparse
+import os
 import sys
-import logging
 import json
 import re
+from pathlib import Path
 
-# Пути к дирректориям
-script_dir = Path(__file__).resolve().parent
-base_dir = script_dir.parent
-logs_dir = base_dir / "logs"
+'''parser'''
+parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+parser.add_argument('archive', help='Path to the zip archive containing patch file')
+args = parser.parse_args()
 
-# log-файл и report-файл
-# Если не передать аргумент, то файл с логами будет называться 'generate_report.log'
-arguments = sys.argv
-script_name = arguments[0]
-if len(arguments) < 1:
-    arguments.push("generate_report")
-log_name = arguments[1] + ".log"
-report_name = arguments[1] + ".json"
-log_file = logs_dir / log_name
-report_file = logs_dir / report_name
+lab_branch = args.lab_branch
+archive_path = Path(args.archive)
+archive_name = os.path.basename(archive_path)
 
-# Логирование
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, mode='w'),  # перезаписывать каждый запуск
-        # logging.StreamHandler(sys.stdout) # It is just superfluous
-    ]
-)
+'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
 
-# Список log-файлов для объединение в log_file
-log_files_to_merge = ["load.log", "file_checker.log", "qemu-gdb.log", "error.log"]
-
-# Открытие log_file на запись и добавление содержимого других логов
-with open(log_file, 'w') as output_log:
-    for file in log_files_to_merge:
-        if file == "file_checker.log":
-            output_log.write("\nTrivial checks:\n")
-        elif file == "qemu-gdb.log":
-            output_log.write("\nChecking the performance of laboratory work:\n")
-        file_path = logs_dir / file
-        try:
-            with open(file_path, 'r', encoding='utf-8') as input_log:
-                output_log.write(input_log.read())
-        except FileNotFoundError:
-            logging.warning(f"File {file} is not found")
-        except Exception as e:
-            logging.error(f"Error while reading {file}: {e}")
-            
-
-# Преобразование log-файла в формат .json
-with open(log_file, 'r', encoding='utf-8') as log_file_r:
-    log_lines = log_file_r.readlines()
+LOG_FILE = LOGS_DIR / f"{archive_name}.log"
+REPORT_FILE = LOGS_DIR / f"{archive_name}.json"           
 
 def parse_log_line(line):
     regex = r'([\d-]+\s[\d:,]+) - (\w+) - (.+)'
@@ -67,8 +37,16 @@ def parse_log_line(line):
     else:
         return None
 
-log_entries = [parse_log_line(line) for line in log_lines if line.strip()]
-log_entries = [entry for entry in log_entries if entry is not None]
+def main():
+    '''Преобразование log-файла в формат .json'''
+    with open(LOG_FILE, 'r', encoding='utf-8') as log_file_r:
+        log_lines = log_file_r.readlines()
 
-with open(report_file, 'w', encoding='utf-8') as json_file:
-    json.dump(log_entries, json_file, ensure_ascii=False, indent=4)
+    log_entries = [parse_log_line(line) for line in log_lines if line.strip()]
+    log_entries = [entry for entry in log_entries if entry is not None]
+    
+    with open(REPORT_FILE, 'w', encoding='utf-8') as json_file:
+        json.dump(log_entries, json_file, ensure_ascii=False, indent=4)
+
+if __name__ == '__main__':
+    main()

@@ -9,25 +9,29 @@ import subprocess
 import logging
 from pathlib import Path
 
-# путь к папке scripts
-script_dir = Path(__file__).resolve().parent
-logs_dir = script_dir.parent / 'logs'
-logs_dir.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
+'''parser'''
+parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
+parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
+parser.add_argument('archive', help='Path to the zip archive containing patch file')
+args = parser.parse_args()
 
-log_file = logs_dir / 'load.log'
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, mode='w'),  # перезаписывать каждый запуск
-    ]
-)
-logging.info(f"Logging to {log_file}")
+lab_branch = args.lab_branch
+archive_path = Path(args.archive)
+archive_name = os.path.basename(archive_path)
 
+'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
+
+LOG_FILE = LOGS_DIR / f"{archive_name}.log"
+
+'''REPO'''
 XV6_REPO_URL = "git://g.csail.mit.edu/xv6-labs-2024"
-XV6_REPO_DIR = script_dir.parent / 'lab_ready' / 'xv6-labs-2024'
+XV6_REPO_DIR = SCRIPT_DIR.parent / 'lab_ready' / 'xv6-labs-2024'
 
-PATCH_DEST_DIR = script_dir.parent / 'lab_ready'
+PATCH_DEST_DIR = SCRIPT_DIR.parent / 'lab_ready'
 PATCH_DEST_DIR.mkdir(parents=True, exist_ok=True)
 
 LAB_BRANCH_MAPPING = {
@@ -43,22 +47,15 @@ LAB_BRANCH_MAPPING = {
     'mmap': 'mmap',
 }
 
-def detect_lab_branch(archive_name):
-    """Определяет ветку лабы на основе имени архива"""
-    archive_name = archive_name.lower()
-    
-    for lab_pattern, branch in LAB_BRANCH_MAPPING.items():
-        if lab_pattern in archive_name:
-            return branch
-    
-    match = re.search(r'lab-?(\w+)', archive_name)
-    if match:
-        lab_name = match.group(1)
-        if lab_name in LAB_BRANCH_MAPPING:
-            return LAB_BRANCH_MAPPING[lab_name]
-    
-    logging.warning(f"Cannot detect lab branch from archive name: {archive_name}")
-    return None
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(LOG_FILE, mode='w'),  # перезаписывать каждый запуск
+        ]
+    )
+    logging.info(f"Logging to {LOG_FILE}")
 
 def clone_xv6_repo():
     """Клонирует репозиторий xv6, если он ещё не существует"""
@@ -222,14 +219,8 @@ def check_makefile_changed(patch_file):
         return False
 
 def main():
-    parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
-    parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
-    parser.add_argument('archive', help='Path to the zip archive containing patch file')
-    args = parser.parse_args()
-
-    lab_branch = args.lab_branch
-    archive_path = Path(args.archive)
-
+    setup_logging()
+    
     if not archive_path.is_file():
         logging.error(f"Archive not found: {archive_path}")
         sys.exit(1)
