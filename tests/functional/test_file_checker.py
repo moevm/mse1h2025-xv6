@@ -1,20 +1,8 @@
 import pytest
-import sys
-import importlib
+from scripts import file_checker
 import os
 import tempfile
 import logging
-from unittest.mock import patch
-
-@pytest.fixture(autouse=True)
-def mock_arguments():
-    """Фиктивные аргументы для всех тестов"""
-    with patch.object(sys, 'argv', ['file_checker.py', 'util', 'dummy.zip']):
-        yield
-
-@pytest.fixture
-def file_checker():
-    return importlib.reload(importlib.import_module('scripts.file_checker'))
 
 @pytest.fixture
 def test_files():
@@ -23,45 +11,38 @@ def test_files():
         os.makedirs(user_dir)
 
         # Valid C file
-        with open(os.path.join(user_dir, "valid.c"), "w", encoding="utf-8") as f:
-            f.write("/* Valid C file */")
+        with open(os.path.join(user_dir, "valid.c"), "w") as f:
+            f.write("/* Valid */")
 
-        # File with non-UTF-8 encoding
-        with open(os.path.join(user_dir, "invalid_enc.txt"), "w", encoding="cp1251") as f:
-            f.write("Лорем ипсум")
+        # Non-UTF8 file
+        with open(os.path.join(user_dir, "invalid.txt"), "wb") as f:
+            f.write(b"\x80abc")
 
-        # Large file (2MB)
+        # Large file
         with open(os.path.join(user_dir, "big.file"), "wb") as f:
-            f.write(b"A" * 2 * 1024 * 1024)
+            f.write(b"A" * 2*1024*1024)
 
-        # File with invalid extension
-        with open(os.path.join(user_dir, "invalid_ext.py"), "w", encoding="utf-8") as f:
-            f.write("# Python file")
+        # Invalid extension
+        with open(os.path.join(user_dir, "bad.py"), "w") as f:
+            f.write("print('test')")
 
         yield tmpdir
 
-def test_file_validation(file_checker, test_files):
-    logger = logging.getLogger('FileChecker')
+def test_file_validation(test_files):
+    logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-
-    # Очистка обработчиков логов
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    logger.addHandler(logging.NullHandler())
 
     errors, dirs, files = file_checker.validate_files(
         test_files,
-        ['.c', '.h', '.txt'],  # Допустимые расширения
-        logger,
-        max_size_mb=1  # Максимальный размер
+        valid_extensions=['.c', '.h', '.txt'],
+        logger=logger,
+        max_size_mb=1
     )
 
-    assert dirs == 1, "Должна быть проверена 1 директория user"
-    assert files == 4, "Должно быть проверено 4 файла"
-    assert len(errors) == 4, f"Обнаружено {len(errors)} ошибок вместо ожидаемых 4"
-
-    error_messages = [e.lower() for e in errors]
-    assert any("invalid extension" in e and '.file' in e for e in error_messages), "Неверное расширение для big.file"
-    assert any("exceeds the maximum size" in e for e in error_messages), "Не обнаружено превышение размера"
-    assert any("not in 'utf-8' encoding" in e for e in error_messages), "Проблема с кодировкой"
-    assert any("invalid extension" in e and '.py' in e for e in error_messages), "Неверное расширение для .py"
+    assert dirs == 1
+    assert files == 4
+    assert len(errors) == 4
+    assert any("invalid extension '.file'" in e for e in errors)
+    assert any("exceeds the maximum size" in e for e in errors)
+    assert any("not in 'utf-8' encoding" in e for e in errors)
+    assert any("invalid extension '.py'" in e for e in errors)
