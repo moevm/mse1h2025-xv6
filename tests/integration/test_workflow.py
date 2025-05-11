@@ -150,7 +150,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
     assert "$U/_sleep\\" in content, "Patch not applied correctly - sleep not added to UPROGS"
 
     checker_result = subprocess.run(
-        ["python", str(scripts_dir / "file_checker.py")],
+        ["python", str(scripts_dir / "file_checker.py"), "util", str(create_test_zip)],
         cwd=base_dir,
         capture_output=True,
         text=True,
@@ -163,9 +163,22 @@ fs.img: mkfs/mkfs README $(UPROGS)
 
     assert checker_result.returncode == 0, "file_checker.py failed"
 
+    test_result = subprocess.run(
+        ["python", str(scripts_dir / "run_tests.py"), "util", str(create_test_zip)],
+        cwd=base_dir,
+        capture_output=True,
+        text=True,
+        timeout=300
+    )
+
+    print("\n=== RUN_TESTS.PY OUTPUT ===")
+    print("STDOUT:", test_result.stdout)
+    print("STDERR:", test_result.stderr)
+
+    assert test_result.returncode in [0, 1], "run_tests.py failed"
 
     report_result = subprocess.run(
-        ["python", str(scripts_dir / "generate_report.py"), "test_report"],
+        ["python", str(scripts_dir / "generate_report.py"), "util", str(create_test_zip)],
         cwd=base_dir,
         capture_output=True,
         text=True
@@ -177,11 +190,26 @@ fs.img: mkfs/mkfs README $(UPROGS)
 
     assert report_result.returncode == 0, "generate_report.py failed"
 
-    report_path = base_dir / "logs" / "test_report.json"
-    assert report_path.exists(), "Report file not found"
+    archive_name = Path(create_test_zip).name
+    report_name = f"{archive_name}.json"
+    report_path = logs_dir / report_name
+
+    assert report_path.exists(), f"Report file {report_name} not found in {logs_dir}"
 
     with open(report_path) as f:
         report = json.load(f)
 
     assert len(report) > 0, "Report is empty"
-    assert any("Logging started" in entry["message"] for entry in report), "No log entries found"
+    valid_log_patterns = [
+        "Logging to",
+        "Extracting patch",
+        "Checking files",
+        "Starting Tests",
+        "Process finished",
+        "Summary:"
+    ]
+
+    assert any(
+        any(pattern in entry.get("message", "") for pattern in valid_log_patterns)
+        for entry in report
+    ), f"No valid log patterns found. First 5 entries:\n{json.dumps(report[:5], indent=2)}"
