@@ -175,7 +175,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
     print("STDOUT:", test_result.stdout)
     print("STDERR:", test_result.stderr)
 
-    assert test_result.returncode in [0, 1], "run_tests.py failed"
+    assert test_result.returncode in [0, 2], "run_tests.py failed"
 
     report_result = subprocess.run(
         ["python", str(scripts_dir / "generate_report.py"), "util", str(create_test_zip)],
