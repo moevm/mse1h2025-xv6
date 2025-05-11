@@ -5,48 +5,49 @@ import json
 import re
 from pathlib import Path
 
-'''parser'''
-parser = argparse.ArgumentParser(description='Apply student patch to xv6 lab repository.')
-parser.add_argument('lab_branch', help='Lab branch name (e.g., util, syscall, thread, etc.)')
-parser.add_argument('archive', help='Path to the zip archive containing patch file')
-args = parser.parse_args()
-
-lab_branch = args.lab_branch
-archive_path = Path(args.archive)
-archive_name = os.path.basename(archive_path)
-
-'''SCRIPT_DIR, BASE_DIR, LOGS_DIR, LOG_FILE'''
-SCRIPT_DIR = Path(__file__).resolve().parent
-BASE_DIR = SCRIPT_DIR.parent
-LOGS_DIR = BASE_DIR / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)  # создаём папку logs, если нет
-
-LOG_FILE = LOGS_DIR / f"{archive_name}.log"
-REPORT_FILE = LOGS_DIR / f"{archive_name}.json"           
-
 def parse_log_line(line):
     regex = r'([\d-]+\s[\d:,]+) - (\w+) - (.+)'
     match = re.match(regex, line.strip())
     if match:
-        timestamp, level, message = match.groups()
         return {
-            "timestamp": timestamp,
-            "level": level,
-            "message": message
+            "timestamp": match.group(1),
+            "level": match.group(2),
+            "message": match.group(3)
         }
-    else:
-        return None
+    return None
 
 def main():
-    '''Преобразование log-файла в формат .json'''
-    with open(LOG_FILE, 'r', encoding='utf-8') as log_file_r:
-        log_lines = log_file_r.readlines()
+    parser = argparse.ArgumentParser(description='Generate test report')
+    parser.add_argument('lab_branch', help='Lab branch name')
+    parser.add_argument('archive', help='Path to zip archive')
+    args = parser.parse_args()
 
-    log_entries = [parse_log_line(line) for line in log_lines if line.strip()]
-    log_entries = [entry for entry in log_entries if entry is not None]
-    
-    with open(REPORT_FILE, 'w', encoding='utf-8') as json_file:
-        json.dump(log_entries, json_file, ensure_ascii=False, indent=4)
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR.parent
+    LOGS_DIR = BASE_DIR / "logs"
+    LOG_FILE = LOGS_DIR / f"{os.path.basename(args.archive)}.log"
+    REPORT_FILE = LOGS_DIR / f"{os.path.basename(args.archive)}.json"
+
+    print(f"Generating report from: {LOG_FILE}")
+    print(f"Saving report to: {REPORT_FILE}")
+
+    try:
+        # Чтение с обработкой ошибок кодировки
+        with open(LOG_FILE, 'r', encoding='utf-8', errors='replace') as f:
+            log_entries = []
+            for line in f:
+                entry = parse_log_line(line)
+                if entry:
+                    log_entries.append(entry)
+
+        # Запись отчета
+        with open(REPORT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(log_entries, f, indent=2, ensure_ascii=False)
+            print(f"Successfully wrote report to {REPORT_FILE}")
+
+    except Exception as e:
+        print(f"Error generating report: {str(e)}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
