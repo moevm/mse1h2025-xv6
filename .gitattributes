@@ -1,0 +1,34 @@
+# Базовые настройки для всех текстовых файлов
+* text=auto eol=lf
+
+# Бинарные файлы
+*.log binary
+*.pdf binary
+*.zip binary
+
+# Скрипты и исполняемые файлы
+*.sh text eol=lf
+*.py text eol=lf
+Makefile text eol=lf
+
+# Конфигурационные файлы
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+*.dockerignore text eol=lf
+
+# Docker файлы
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.S text eol=lf
+*.ld text eol=lf
+*.mk text eol=lf 
