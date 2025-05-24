@@ -47,6 +47,9 @@ LAB_BRANCH_MAPPING = {
     'mmap': 'mmap',
 }
 
+# Лабораторные работы, для которых нужно проверять изменения в Makefile
+MAKEFILE_CHECK_LABS = {'util', 'syscall', 'traps', 'fs'}
+
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -82,8 +85,10 @@ def checkout_lab_branch(branch_name):
     """Переключается на ветку лабы"""
     logging.info(f"Checking out lab branch: {branch_name}")
     try:
+        # Сначала проверяем, есть ли ветка в origin
+        remote_branch = f"origin/{branch_name}"
         result = subprocess.run(
-            ['git', 'show-ref', '--verify', f'refs/heads/{branch_name}'],
+            ['git', 'show-ref', '--verify', f'refs/remotes/{remote_branch}'],
             cwd=XV6_REPO_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -91,9 +96,10 @@ def checkout_lab_branch(branch_name):
         )
         
         if result.returncode != 0:
-            logging.error(f"Branch {branch_name} doesn't exist in the repository")
+            logging.error(f"Branch {branch_name} doesn't exist in the repository (neither local nor remote)")
             return False
         
+        # Пытаемся переключиться на ветку 
         subprocess.run(
             ['git', 'checkout', branch_name],
             cwd=XV6_REPO_DIR,
@@ -242,9 +248,12 @@ def main():
         logging.error("Failed to apply patch. Exiting.")
         sys.exit(1)
 
-    if not check_makefile_changed(patch_file):
-        logging.error("Patch does not change the Makefile. Exiting.")
-        sys.exit(1)
+    if lab_branch in MAKEFILE_CHECK_LABS:
+        if not check_makefile_changed(patch_file):
+            logging.error(f"Patch does not change the Makefile (required for {lab_branch} lab). Exiting.")
+            sys.exit(1)
+    else:
+        logging.info(f"Skipping Makefile check for {lab_branch} lab")
 
     logging.info(f"Successfully applied patch to xv6 repository at {XV6_REPO_DIR}")
     logging.info(f"Lab branch: {lab_branch}")
