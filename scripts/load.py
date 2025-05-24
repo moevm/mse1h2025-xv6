@@ -34,6 +34,19 @@ XV6_REPO_DIR = SCRIPT_DIR.parent / 'lab_ready' / 'xv6-labs-2024'
 PATCH_DEST_DIR = SCRIPT_DIR.parent / 'lab_ready'
 PATCH_DEST_DIR.mkdir(parents=True, exist_ok=True)
 
+#фиксированные хеши коммитов для каждой ветки
+BRANCH_COMMIT_MAPPING = {
+    'util': '79e8024d61c3dd92ccf064fc67bb99cb999f70ab',
+    'syscall': 'd5b09ff4571e07f6d996fdf7ce1533afc19a6978',
+    'pgtbl': 'db30f8d9f46732d926995fb97a2ea0362f0654ee',
+    'traps': '814d126edf03b5498dbc7e0796190b938837a851',
+    'cow': '19fa72d7dccf193c7e09789db708443736c2954c',
+    'net': '0b94a6a45fc79ad87112d16622bb5f2f130c893b',
+    'lock': 'fc27289d78a415ed4e4264a80b88c8496db70eef',
+    'fs': '408565dc36c7595de3e68284a3789c081901b88f',
+    'mmap': '6dd1443e74895a3953d837106392a9ad538fbab2',
+}
+
 LAB_BRANCH_MAPPING = {
     'util': 'util',
     'syscall': 'syscall',
@@ -82,7 +95,7 @@ def clone_xv6_repo():
         return False
 
 def checkout_lab_branch(branch_name):
-    """Переключается на ветку лабы"""
+    """Переключается на ветку лабы с фиксированным коммитом"""
     logging.info(f"Checking out lab branch: {branch_name}")
     try:
         # Сначала проверяем, есть ли ветка в origin
@@ -99,7 +112,7 @@ def checkout_lab_branch(branch_name):
             logging.error(f"Branch {branch_name} doesn't exist in the repository (neither local nor remote)")
             return False
         
-        # Пытаемся переключиться на ветку 
+        #пытаемся переключиться на ветку 
         subprocess.run(
             ['git', 'checkout', branch_name],
             cwd=XV6_REPO_DIR,
@@ -109,6 +122,63 @@ def checkout_lab_branch(branch_name):
             text=True
         )
 
+        #если для ветки есть фиксированный коммит, используем его
+        if branch_name in BRANCH_COMMIT_MAPPING:
+            commit_hash = BRANCH_COMMIT_MAPPING[branch_name]
+            logging.info(f"Using fixed commit for branch {branch_name}: {commit_hash}")
+            
+            #проверяем существование коммита
+            result = subprocess.run(
+                ['git', 'cat-file', '-e', commit_hash],
+                cwd=XV6_REPO_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                #если коммит не найден локально, пробуем обновить репозиторий
+                logging.warning(f"Commit {commit_hash} not found locally. Trying to fetch from remote.")
+                subprocess.run(
+                    ['git', 'fetch', '--all'],
+                    cwd=XV6_REPO_DIR,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                #проверяем еще раз после загрузки
+                result = subprocess.run(
+                    ['git', 'cat-file', '-e', commit_hash],
+                    cwd=XV6_REPO_DIR,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                if result.returncode != 0:
+                    logging.error(f"Could not find commit {commit_hash} for branch {branch_name}")
+                    return False
+            
+            #сбрасываем ветку до указанного коммита
+            result = subprocess.run(
+                ['git', 'reset', '--hard', commit_hash],
+                cwd=XV6_REPO_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                logging.error(f"Failed to reset to commit {commit_hash}: {result.stderr}")
+                return False
+            
+            logging.info(f"Successfully reset to fixed commit {commit_hash}")
+        else:
+            #если фиксированный коммит не определен, используем текущий коммит
+            logging.warning(f"No fixed commit defined for branch {branch_name}, using latest commit")
+        
+        #получаем текущий хеш коммита для логирования
         result = subprocess.run(
             ['git', 'rev-parse', 'HEAD'],
             cwd=XV6_REPO_DIR,
